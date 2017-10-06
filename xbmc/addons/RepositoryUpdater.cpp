@@ -29,6 +29,7 @@
 #include "events/AddonManagementEvent.h"
 #include "events/EventLog.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
 #include "settings/Settings.h"
 #include "threads/SingleLock.h"
 #include "utils/JobManager.h"
@@ -40,20 +41,38 @@
 namespace ADDON
 {
 
-CRepositoryUpdater::CRepositoryUpdater() :
+CRepositoryUpdater::CRepositoryUpdater(CAddonMgr& addonMgr) :
   m_timer(this),
-  m_doneEvent(true)
-{}
-
-CRepositoryUpdater &CRepositoryUpdater::GetInstance()
+  m_doneEvent(true),
+  m_addonMgr(addonMgr)
 {
-  static CRepositoryUpdater instance;
-  return instance;
+  // Register settings
+  std::set<std::string> settingSet;
+  settingSet.insert(CSettings::SETTING_ADDONS_AUTOUPDATES);
+  CServiceBroker::GetSettings().RegisterCallback(this, settingSet);
 }
 
 void CRepositoryUpdater::Start()
 {
+  m_addonMgr.Events().Subscribe(this, &CRepositoryUpdater::OnEvent);
   ScheduleUpdate();
+}
+
+CRepositoryUpdater::~CRepositoryUpdater()
+{
+  // Unregister settings
+  CServiceBroker::GetSettings().UnregisterCallback(this);
+
+  m_addonMgr.Events().Unsubscribe(this);
+}
+
+void CRepositoryUpdater::OnEvent(const ADDON::AddonEvent& event)
+{
+  if (typeid(event) == typeid(ADDON::AddonEvents::Enabled))
+  {
+    if (m_addonMgr.HasType(event.id, ADDON_REPOSITORY))
+      ScheduleUpdate();
+  }
 }
 
 void CRepositoryUpdater::OnJobComplete(unsigned int jobID, bool success, CJob* job)
@@ -65,7 +84,7 @@ void CRepositoryUpdater::OnJobComplete(unsigned int jobID, bool success, CJob* j
     CLog::Log(LOGDEBUG, "CRepositoryUpdater: done.");
     m_doneEvent.Set();
 
-    VECADDONS updates = CAddonMgr::GetInstance().GetAvailableUpdates();
+    VECADDONS updates = m_addonMgr.GetAvailableUpdates();
 
     if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_NOTIFY)
     {
@@ -99,7 +118,7 @@ void CRepositoryUpdater::OnJobComplete(unsigned int jobID, bool success, CJob* j
 bool CRepositoryUpdater::CheckForUpdates(bool showProgress)
 {
   VECADDONS addons;
-  if (CAddonMgr::GetInstance().GetAddons(addons, ADDON_REPOSITORY) && !addons.empty())
+  if (m_addonMgr.GetAddons(addons, ADDON_REPOSITORY) && !addons.empty())
   {
     CSingleLock lock(m_criticalSection);
     for (const auto& addon : addons)
@@ -113,7 +132,7 @@ bool CRepositoryUpdater::CheckForUpdates(bool showProgress)
 
 static void SetProgressIndicator(CRepositoryUpdateJob* job)
 {
-  auto dialog = g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>();
+  auto dialog = g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
   if (dialog)
     job->SetProgressIndicators(dialog->GetHandle(g_localizeStrings.Get(24092)), nullptr);
 }
@@ -149,6 +168,7 @@ void CRepositoryUpdater::OnTimeout()
 {
   //workaround
   if (g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO ||
+      g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_GAME ||
       g_windowManager.GetActiveWindow() == WINDOW_SLIDESHOW)
   {
     CLog::Log(LOGDEBUG,"CRepositoryUpdater: busy playing. postponing scheduled update");
@@ -160,7 +180,7 @@ void CRepositoryUpdater::OnTimeout()
   CheckForUpdates();
 }
 
-void CRepositoryUpdater::OnSettingChanged(const CSetting* setting)
+void CRepositoryUpdater::OnSettingChanged(std::shared_ptr<const CSetting> setting)
 {
   if (setting->GetId() == CSettings::SETTING_ADDONS_AUTOUPDATES)
     ScheduleUpdate();
@@ -169,7 +189,7 @@ void CRepositoryUpdater::OnSettingChanged(const CSetting* setting)
 CDateTime CRepositoryUpdater::LastUpdated() const
 {
   VECADDONS repos;
-  if (!CAddonMgr::GetInstance().GetAddons(repos, ADDON_REPOSITORY) || repos.empty())
+  if (!m_addonMgr.GetAddons(repos, ADDON_REPOSITORY) || repos.empty())
     return CDateTime();
 
   CAddonDatabase db;
@@ -197,7 +217,7 @@ void CRepositoryUpdater::ScheduleUpdate()
   if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_ADDONS_AUTOUPDATES) == AUTO_UPDATES_NEVER)
     return;
 
-  if (!CAddonMgr::GetInstance().HasAddons(ADDON_REPOSITORY))
+  if (!m_addonMgr.HasAddons(ADDON_REPOSITORY))
     return;
 
   auto prev = LastUpdated();

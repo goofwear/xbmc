@@ -87,9 +87,9 @@ public:
 private:
   // private construction, and no assignments; use the provided singleton methods
   CPasswordManager();
-  CPasswordManager(const CPasswordManager&);
-  CPasswordManager const & operator=(CPasswordManager const&);
-  ~CPasswordManager() {};
+  CPasswordManager(const CPasswordManager&) = delete;
+  CPasswordManager& operator=(CPasswordManager const&) = delete;
+  ~CPasswordManager() = default;
 
   void Load();
   void Save() const;

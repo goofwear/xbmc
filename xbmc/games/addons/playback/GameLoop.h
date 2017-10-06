@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
 #include "threads/Event.h"
 #include "threads/Thread.h"
 
+namespace KODI
+{
 namespace GAME
 {
   class IGameLoopCallback
@@ -55,6 +57,7 @@ namespace GAME
 
     double GetSpeed() const { return m_speedFactor; }
     void SetSpeed(double speedFactor);
+    void PauseAsync();
 
   protected:
     // implementation of CThread
@@ -68,8 +71,10 @@ namespace GAME
     IGameLoopCallback* const m_callback;
     const double             m_fps;
     double                   m_speedFactor;
+    bool                     m_bPauseAsync = false;
     double                   m_lastFrameMs;
     CEvent                   m_sleepEvent;
     CCriticalSection         m_mutex;
   };
+}
 }

@@ -25,7 +25,6 @@
 #include "settings/AdvancedSettings.h"
 #include "GUIUserMessages.h"
 #include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogOK.h"
 #include "playlists/PlayList.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -37,6 +36,8 @@
 #include "input/Key.h"
 #include "URL.h"
 #include "messaging/ApplicationMessenger.h"
+#include "filesystem/VideoDatabaseFile.h"
+#include "messaging/helpers/DialogOKHelper.h"
 
 using namespace PLAYLIST;
 using namespace KODI::MESSAGING;
@@ -106,6 +107,11 @@ bool CPlayListPlayer::OnMessage(CGUIMessage &message)
         m_iCurrentPlayList = PLAYLIST_NONE;
         return true;
       }
+    }
+    break;
+  case GUI_MSG_PLAYBACK_STARTED:
+    {
+      m_bPlaybackStarted = true;
     }
     break;
   }
@@ -255,6 +261,27 @@ bool CPlayListPlayer::PlaySongId(int songId)
   return Play();
 }
 
+bool CPlayListPlayer::Play(const CFileItemPtr &pItem, std::string player)
+{
+  int playlist;
+  if (pItem->IsAudio())
+    playlist = PLAYLIST_MUSIC;
+  else if (pItem->IsVideo())
+    playlist = PLAYLIST_VIDEO;
+  else
+  {
+    CLog::Log(LOGWARNING,"Playlist Player: ListItem type must be audio or video, use ListItem::setInfo to specify!");
+    return false;
+  }
+
+  ClearPlaylist(playlist);
+  Reset();
+  SetCurrentPlaylist(playlist);
+  Add(playlist, pItem);
+
+  return Play(0, player);
+}
+
 bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = false */, bool bPlayPrevious /* = false */)
 {
   if (m_iCurrentPlayList == PLAYLIST_NONE)
@@ -271,14 +298,17 @@ bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = fa
   // check if the item itself is a playlist, and can be expanded
   // only allow a few levels, this could end up in a loop
   // if they refer to each other in a loop
-  for(int i=0;i<5;i++)
+  for (int i=0;i<5;i++)
   {
-     if(!playlist.Expand(iSong))
-        break;
+    if(!playlist.Expand(iSong))
+      break;
   }
 
   m_iCurrentSong = iSong;
   CFileItemPtr item = playlist[m_iCurrentSong];
+  if (item->IsVideoDb() && !item->HasVideoInfoTag())
+    *(item->GetVideoInfoTag()) = XFILE::CVideoDatabaseFile::GetVideoTag(CURL(item->GetPath()));
+
   playlist.SetPlayed(true);
 
   m_bPlaybackStarted = false;
@@ -302,7 +332,7 @@ bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = fa
       CLog::Log(LOGDEBUG,"Playlist Player: one or more items failed to play... aborting playback");
 
       // open error dialog
-      CGUIDialogOK::ShowAndGetInput(CVariant{16026}, CVariant{16027});
+      HELPERS::ShowOKDialogText(CVariant{16026}, CVariant{16027});
 
       CGUIMessage msg(GUI_MSG_PLAYLISTPLAYER_STOPPED, 0, 0, m_iCurrentPlayList, m_iCurrentSong);
       g_windowManager.SendThreadMessage(msg);
@@ -342,7 +372,6 @@ bool CPlayListPlayer::Play(int iSong, std::string player, bool bAutoPlay /* = fa
   // consecutive error counter so reset if the current item is playing
   m_iFailedSongs = 0;
   m_failedSongsStart = 0;
-  m_bPlaybackStarted = true;
   m_bPlayedFirstFile = true;
   return true;
 }
@@ -582,18 +611,18 @@ void CPlayListPlayer::ReShuffle(int iPlaylist, int iPosition)
       (g_application.m_pPlayer->IsPlayingVideo() && iPlaylist == PLAYLIST_VIDEO)
       )
     {
-      g_playlistPlayer.GetPlaylist(iPlaylist).Shuffle(m_iCurrentSong + 2);
+      CServiceBroker::GetPlaylistPlayer().GetPlaylist(iPlaylist).Shuffle(m_iCurrentSong + 2);
     }
   }
   // otherwise, shuffle from the passed position
   // which is the position of the first new item added
   else
   {
-    g_playlistPlayer.GetPlaylist(iPlaylist).Shuffle(iPosition);
+    CServiceBroker::GetPlaylistPlayer().GetPlaylist(iPlaylist).Shuffle(iPosition);
   }
 }
 
-void CPlayListPlayer::Add(int iPlaylist, CPlayList& playlist)
+void CPlayListPlayer::Add(int iPlaylist, const CPlayList& playlist)
 {
   if (iPlaylist != PLAYLIST_MUSIC && iPlaylist != PLAYLIST_VIDEO)
     return;
@@ -615,7 +644,7 @@ void CPlayListPlayer::Add(int iPlaylist, const CFileItemPtr &pItem)
     ReShuffle(iPlaylist, iSize);
 }
 
-void CPlayListPlayer::Add(int iPlaylist, CFileItemList& items)
+void CPlayListPlayer::Add(int iPlaylist, const CFileItemList& items)
 {
   if (iPlaylist != PLAYLIST_MUSIC && iPlaylist != PLAYLIST_VIDEO)
     return;
@@ -626,7 +655,7 @@ void CPlayListPlayer::Add(int iPlaylist, CFileItemList& items)
     ReShuffle(iPlaylist, iSize);
 }
 
-void CPlayListPlayer::Insert(int iPlaylist, CPlayList& playlist, int iIndex)
+void CPlayListPlayer::Insert(int iPlaylist, const CPlayList& playlist, int iIndex)
 {
   if (iPlaylist != PLAYLIST_MUSIC && iPlaylist != PLAYLIST_VIDEO)
     return;
@@ -652,7 +681,7 @@ void CPlayListPlayer::Insert(int iPlaylist, const CFileItemPtr &pItem, int iInde
     m_iCurrentSong++;
 }
 
-void CPlayListPlayer::Insert(int iPlaylist, CFileItemList& items, int iIndex)
+void CPlayListPlayer::Insert(int iPlaylist, const CFileItemList& items, int iIndex)
 {
   if (iPlaylist != PLAYLIST_MUSIC && iPlaylist != PLAYLIST_VIDEO)
     return;
@@ -758,7 +787,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
   case TMSG_PLAYLISTPLAYER_ADD:
     if (pMsg->lpVoid)
     {
-      CFileItemList *list = (CFileItemList *)pMsg->lpVoid;
+      CFileItemList *list = static_cast<CFileItemList*>(pMsg->lpVoid);
 
       Add(pMsg->param1, (*list));
       delete list;
@@ -768,7 +797,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
   case TMSG_PLAYLISTPLAYER_INSERT:
     if (pMsg->lpVoid)
     {
-      CFileItemList *list = (CFileItemList *)pMsg->lpVoid;
+      CFileItemList *list = static_cast<CFileItemList*>(pMsg->lpVoid);
       Insert(pMsg->param1, (*list), pMsg->param2);
       delete list;
     }
@@ -817,7 +846,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
     // first check if we were called from the PlayFile() function
     if (pMsg->lpVoid && pMsg->param2 == 0)
     {
-      CFileItem *item = (CFileItem *)pMsg->lpVoid;
+      CFileItem *item = static_cast<CFileItem*>(pMsg->lpVoid);
       g_application.PlayFile(*item, "", pMsg->param1 != 0);
       delete item;
       return;
@@ -825,6 +854,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
     // restore to previous window if needed
     if (g_windowManager.GetActiveWindow() == WINDOW_SLIDESHOW ||
       g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO ||
+      g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_GAME ||
       g_windowManager.GetActiveWindow() == WINDOW_VISUALISATION)
       g_windowManager.PreviousWindow();
 
@@ -835,7 +865,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
     // play file
     if (pMsg->lpVoid)
     {
-      CFileItemList *list = (CFileItemList *)pMsg->lpVoid;
+      CFileItemList *list = static_cast<CFileItemList*>(pMsg->lpVoid);
 
       if (list->Size() > 0)
       {
@@ -851,10 +881,14 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
 
         ClearPlaylist(playlist);
         SetCurrentPlaylist(playlist);
-        //For single item lists try PlayMedia. This covers some more cases where a playlist is not appropriate
-        //It will fall through to PlayFile
         if (list->Size() == 1 && !(*list)[0]->IsPlayList())
-          g_application.PlayMedia(*((*list)[0]), pMsg->strParam, playlist);
+        {
+          CFileItemPtr item = (*list)[0];
+          if (item->IsAudio() || item->IsVideo())
+            Play(item, pMsg->strParam);
+          else
+            g_application.PlayMedia(*item, pMsg->strParam, playlist);
+        }
         else
         {
           // Handle "shuffled" option if present
@@ -900,6 +934,7 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
 
     if ((stopSlideshow && g_windowManager.GetActiveWindow() == WINDOW_SLIDESHOW) ||
       (stopVideo && g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_VIDEO) ||
+      (stopVideo && g_windowManager.GetActiveWindow() == WINDOW_FULLSCREEN_GAME) ||
       (stopMusic && g_windowManager.GetActiveWindow() == WINDOW_VISUALISATION))
       g_windowManager.PreviousWindow();
 

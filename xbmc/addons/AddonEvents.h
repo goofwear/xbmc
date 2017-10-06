@@ -25,29 +25,68 @@ namespace ADDON
 {
   struct AddonEvent
   {
-    virtual ~AddonEvent() {};
+    std::string id;
+    explicit AddonEvent(std::string id) : id(std::move(id)) {};
+    virtual ~AddonEvent() = default;
   };
 
   namespace AddonEvents
   {
+    /**
+     * Emitted after the add-on has been enabled.
+     */
     struct Enabled : AddonEvent
     {
-      std::string id;
-      Enabled(std::string id) : id(std::move(id)) {}
+      explicit Enabled(std::string id) : AddonEvent(std::move(id)) {}
     };
 
+    /**
+     * Emitted after the add-on has been disabled.
+     */
     struct Disabled : AddonEvent
     {
-      std::string id;
-      Disabled(std::string id) : id(std::move(id)) {}
+      explicit Disabled(std::string id) : AddonEvent(std::move(id)) {}
     };
 
+    /**
+     * Emitted after the add-on's metadata has been changed.
+     */
     struct MetadataChanged : AddonEvent
     {
-      std::string id;
-      MetadataChanged(std::string id) : id(std::move(id)) {}
+      explicit MetadataChanged(std::string id) : AddonEvent(std::move(id)) {}
     };
 
-    struct InstalledChanged : AddonEvent {};
-  };
-};
+    /**
+     * Emitted when a different version of the add-on has been installed
+     * to the file system and should be reloaded.
+     */
+    struct ReInstalled: AddonEvent
+    {
+      explicit ReInstalled(std::string id) : AddonEvent(std::move(id)) {}
+    };
+
+    /**
+     * Emitted after the add-on has been uninstalled.
+     */
+    struct UnInstalled : AddonEvent
+    {
+      explicit UnInstalled(std::string id) : AddonEvent(std::move(id)) {}
+    };
+
+    /**
+     * Emitted after the add-on has been loaded.
+     */
+    struct Load : AddonEvent
+    {
+      explicit Load(std::string id) : AddonEvent(std::move(id)) {}
+    };
+
+    /**
+     * Emitted after the add-on has been unloaded.
+     */
+    struct Unload : AddonEvent
+    {
+      explicit Unload(std::string id) : AddonEvent(std::move(id)) {}
+    };
+  }
+}

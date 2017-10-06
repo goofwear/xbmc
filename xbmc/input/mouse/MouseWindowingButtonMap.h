@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -36,13 +36,13 @@ namespace MOUSE
   class CMouseWindowingButtonMap : public IMouseButtonMap
   {
   public:
-    virtual ~CMouseWindowingButtonMap(void) = default;
+    ~CMouseWindowingButtonMap(void) override = default;
 
     // implementation of IMouseButtonMap
-    virtual std::string ControllerID(void) const override;
-    virtual bool GetButton(unsigned int buttonIndex, std::string& feature) override;
-    virtual bool GetRelativePointer(std::string& feature) override;
-    virtual bool GetButtonIndex(const std::string& feature, unsigned int& buttonIndex) override;
+    std::string ControllerID(void) const override;
+    bool GetButton(unsigned int buttonIndex, std::string& feature) override;
+    bool GetRelativePointer(std::string& feature) override;
+    bool GetButtonIndex(const std::string& feature, unsigned int& buttonIndex) override;
 
   private:
     static std::vector<std::pair<unsigned int, std::string>> m_buttonMap;

@@ -20,23 +20,24 @@
 
 #include "PVRChannelGroupInternal.h"
 
-#include <cassert>
 #include <utility>
 
-#include "dialogs/GUIDialogOK.h"
-#include "epg/EpgContainer.h"
-#include "pvr/addons/PVRClients.h"
+#include "ServiceBroker.h"
+#include "guilib/LocalizeStrings.h"
+#include "messaging/helpers/DialogOKHelper.h"
+#include "settings/AdvancedSettings.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
+
 #include "pvr/PVRDatabase.h"
 #include "pvr/PVRManager.h"
+#include "pvr/addons/PVRClients.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "pvr/epg/EpgContainer.h"
 #include "pvr/timers/PVRTimers.h"
-#include "PVRChannelGroupsContainer.h"
-#include "ServiceBroker.h"
-#include "settings/AdvancedSettings.h"
-#include "utils/log.h"
-#include "utils/Variant.h"
 
 using namespace PVR;
-using namespace EPG;
+using namespace KODI::MESSAGING;
 
 CPVRChannelGroupInternal::CPVRChannelGroupInternal(bool bRadio) :
   m_iHiddenChannels(0)
@@ -99,8 +100,6 @@ void CPVRChannelGroupInternal::UpdateChannelPaths(void)
 
 CPVRChannelPtr CPVRChannelGroupInternal::UpdateFromClient(const CPVRChannelPtr &channel, unsigned int iChannelNumber /* = 0 */)
 {
-  assert(channel.get());
-
   CSingleLock lock(m_critSection);
   const PVRChannelGroupMember& realChannel(GetByUniqueID(channel->StorageId()));
   if (realChannel.channel)
@@ -161,8 +160,6 @@ bool CPVRChannelGroupInternal::AddToGroup(const CPVRChannelPtr &channel, int iCh
 
 bool CPVRChannelGroupInternal::RemoveFromGroup(const CPVRChannelPtr &channel)
 {
-  assert(channel.get());
-
   if (!IsGroupMember(channel))
     return false;
 
@@ -170,7 +167,7 @@ bool CPVRChannelGroupInternal::RemoveFromGroup(const CPVRChannelPtr &channel)
   CPVRChannelPtr currentChannel(CServiceBroker::GetPVRManager().GetCurrentChannel());
   if (currentChannel && currentChannel == channel)
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{19098}, CVariant{19102});
+    HELPERS::ShowOKDialogText(CVariant{19098}, CVariant{19102});
     return false;
   }
 
@@ -227,15 +224,9 @@ int CPVRChannelGroupInternal::LoadFromDb(bool bCompress /* = false */)
 
   int iChannelCount = Size();
 
-  if (database->Get(*this) > 0)
+  if (database->Get(*this, bCompress) == 0)
   {
-    if (bCompress)
-      database->Compress(true);
-  }
-  else
-  {
-    CLog::Log(LOGINFO, "PVRChannelGroupInternal - %s - no channels in the database",
-        __FUNCTION__);
+    CLog::Log(LOGINFO, "PVRChannelGroupInternal - %s - no channels in the database", __FUNCTION__);
   }
 
   SortByChannelNumber();
@@ -312,28 +303,13 @@ bool CPVRChannelGroupInternal::UpdateGroupEntries(const CPVRChannelGroup &channe
 
 void CPVRChannelGroupInternal::CreateChannelEpg(const CPVRChannelPtr &channel, bool bForce /* = false */)
 {
-  if (!channel)
-    return;
-
-  CSingleLock lock(channel->m_critSection);
-  if (!channel->m_bEPGCreated || bForce)
-  {
-    CEpgPtr epg = g_EpgContainer.CreateChannelEpg(channel);
-    if (epg)
-    {
-      channel->m_bEPGCreated = true;
-      if (epg->EpgID() != channel->m_iEpgId)
-      {
-        channel->m_iEpgId = epg->EpgID();
-        channel->m_bChanged = true;
-      }
-    }
-  }
+  if (channel)
+    channel->CreateEPG(bForce);
 }
 
 bool CPVRChannelGroupInternal::CreateChannelEpgs(bool bForce /* = false */)
 {
-  if (!g_EpgContainer.IsStarted())
+  if (!CServiceBroker::GetPVRManager().EpgContainer().IsStarted())
     return false;
   {
     CSingleLock lock(m_critSection);

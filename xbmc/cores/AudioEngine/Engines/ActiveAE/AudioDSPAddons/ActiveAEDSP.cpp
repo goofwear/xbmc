@@ -30,16 +30,17 @@ extern "C" {
 #include "ActiveAEDSPProcess.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonSystemSettings.h"
-#include "addons/GUIDialogAddonSettings.h"
+#include "addons/binary-addons/BinaryAddonBase.h"
+#include "addons/settings/GUIDialogAddonSettings.h"
 #include "Application.h"
 #include "cores/AudioEngine/Engines/ActiveAE/ActiveAEBuffer.h"
 #include "cores/AudioEngine/Interfaces/AEResample.h"
 #include "cores/AudioEngine/Utils/AEUtil.h"
 #include "dialogs/GUIDialogKaiToast.h"
-#include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "guiinfo/GUIInfoLabels.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
 #include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "settings/AdvancedSettings.h"
@@ -74,7 +75,6 @@ CActiveAEDSP::CActiveAEDSP()
 CActiveAEDSP::~CActiveAEDSP()
 {
   Shutdown();
-  CAddonMgr::GetInstance().UnregisterAddonMgrCallback(ADDON_ADSPDLL);
   //CSettings::GetInstance().UnregisterCallback(this);
   //CLog::Log(LOGDEBUG, "ActiveAE DSP - destroyed");
 }
@@ -94,8 +94,6 @@ void CActiveAEDSP::Init(void)
   //! @todo reimplement this with AudioDSP V2.0
   //CSettings::GetInstance().RegisterCallback(this, settingSet);
 
-  CAddonMgr::GetInstance().RegisterAddonMgrCallback(ADDON_ADSPDLL, this);
-
   CSingleLock lock(m_critSection);
 
   UpdateAddons();
@@ -106,10 +104,10 @@ void CActiveAEDSP::Init(void)
 class CActiveAEDSPModeUpdateJob : public CJob
 {
 public:
-  CActiveAEDSPModeUpdateJob() {}
-  ~CActiveAEDSPModeUpdateJob(void) {}
+  CActiveAEDSPModeUpdateJob() = default;
+  ~CActiveAEDSPModeUpdateJob(void) override = default;
 
-  bool DoWork(void)
+  bool DoWork(void) override
   {
     return true;
   }
@@ -145,7 +143,7 @@ void CActiveAEDSP::TriggerModeUpdate(bool bAsync /* = true */)
   {
     for (std::list<AE_DSP_ADDON>::iterator iter = m_addonToDestroy.begin(); iter != m_addonToDestroy.end(); ++iter)
     {
-      if ((*iter)->DllLoaded())
+      if ((*iter)->ReadyToUse())
       {
         (*iter)->Destroy();
       }
@@ -238,7 +236,7 @@ void CActiveAEDSP::ResetDatabase(void)
 
 /*! @name Settings and action callback methods (OnAction currently unused */
 //@{
-void CActiveAEDSP::OnSettingAction(const CSetting *setting)
+void CActiveAEDSP::OnSettingAction(std::shared_ptr<const CSetting> setting)
 {
   if (setting == NULL)
     return;
@@ -247,7 +245,7 @@ void CActiveAEDSP::OnSettingAction(const CSetting *setting)
 
   if (settingId == CSettings::SETTING_AUDIOOUTPUT_DSPSETTINGS)
   {
-    CGUIDialogAudioDSPManager *dialog = g_windowManager.GetWindow<CGUIDialogAudioDSPManager>();
+    CGUIDialogAudioDSPManager *dialog = g_windowManager.GetWindow<CGUIDialogAudioDSPManager>(WINDOW_DIALOG_AUDIO_DSP_MANAGER);
 
     if (dialog)
       dialog->Open();
@@ -266,39 +264,29 @@ void CActiveAEDSP::OnSettingAction(const CSetting *setting)
 
 /*! @name addon installation callback methods */
 //@{
-bool CActiveAEDSP::RequestRestart(AddonPtr addon, bool bDataChanged)
-{
-  return StopAudioDSPAddon(addon, true);
-}
-
-bool CActiveAEDSP::RequestRemoval(AddonPtr addon)
-{
-  return StopAudioDSPAddon(addon, false);
-}
-
 bool CActiveAEDSP::IsInUse(const std::string &strAddonId) const
 {
   CSingleLock lock(m_critSection);
 
   for (AE_DSP_ADDONMAP_CITR citr = m_addonMap.begin(); citr != m_addonMap.end(); ++citr)
-    if (!CAddonMgr::GetInstance().IsAddonDisabled(citr->second->ID()) && citr->second->ID() == strAddonId)
+    if (!CServiceBroker::GetAddonMgr().IsAddonDisabled(citr->second->ID()) && citr->second->ID() == strAddonId)
       return true;
   return false;
 }
 
-bool CActiveAEDSP::IsKnownAudioDSPAddon(const AddonPtr &addon) const
+bool CActiveAEDSP::IsKnownAudioDSPAddon(const std::string& addonId) const
 {
   // database IDs start at 1
-  return GetAudioDSPAddonId(addon) > 0;
+  return GetAudioDSPAddonId(addonId) > 0;
 }
 
-int CActiveAEDSP::GetAudioDSPAddonId(const AddonPtr &addon) const
+int CActiveAEDSP::GetAudioDSPAddonId(const std::string& addonId) const
 {
   CSingleLock lock(m_critSection);
 
   for (auto &entry : m_addonMap)
   {
-    if (entry.second->ID() == addon->ID())
+    if (entry.second->ID() == addonId)
     {
       return entry.first;
     }
@@ -406,7 +394,6 @@ bool CActiveAEDSP::TranslateCharInfo(DWORD dwInfo, std::string &strValue) const
     strValue = activeMaster->IconOverrideModePath();
     break;
   default:
-    bReturn = true;
     strValue.clear();
     bReturn = false;
     break;
@@ -585,7 +572,7 @@ bool CActiveAEDSP::StopAudioDSPAddon(AddonPtr addon, bool bRestart)
 {
   CSingleLock lock(m_critSection);
 
-  int iId = GetAudioDSPAddonId(addon);
+  int iId = GetAudioDSPAddonId(addon->ID());
   AE_DSP_ADDON mappedAddon;
   if (GetReadyAudioDSPAddon(iId, mappedAddon))
   {
@@ -602,25 +589,24 @@ bool CActiveAEDSP::StopAudioDSPAddon(AddonPtr addon, bool bRestart)
 
 void CActiveAEDSP::UpdateAddons()
 {
-  VECADDONS addons;
   AE_DSP_ADDON dspAddon;
 
-  CAddonMgr::GetInstance().GetInstalledAddons(addons, ADDON_ADSPDLL);
-
-  if (addons.empty())
+  BinaryAddonBaseList addonInfos;
+  CServiceBroker::GetBinaryAddonManager().GetAddonInfos(addonInfos, false, ADDON_ADSPDLL);
+  if (addonInfos.empty())
     return;
 
-  for (auto &addon : addons)
+  for (auto &addonInfo : addonInfos)
   {
-    bool bEnabled = !CAddonMgr::GetInstance().IsAddonDisabled(addon->ID());
-    if (bEnabled && (!IsKnownAudioDSPAddon(addon) || !IsReadyAudioDSPAddon(addon)))
+    bool bEnabled = !CServiceBroker::GetAddonMgr().IsAddonDisabled(addonInfo->ID());
+    if (bEnabled && (!IsKnownAudioDSPAddon(addonInfo->ID()) || !IsReadyAudioDSPAddon(addonInfo)))
     {
       std::hash<std::string> hasher;
-      int iAddonId = static_cast<int>(hasher(addon->ID()));
+      int iAddonId = static_cast<int>(hasher(addonInfo->ID()));
       if (iAddonId < 0)
         iAddonId = -iAddonId;
 
-      if (IsKnownAudioDSPAddon(addon))
+      if (IsKnownAudioDSPAddon(addonInfo->ID()))
       {
         AE_DSP_ADDON dspAddon;
         GetAudioDSPAddon(iAddonId, dspAddon);
@@ -628,30 +614,23 @@ void CActiveAEDSP::UpdateAddons()
       }
       else
       {
-        AE_DSP_ADDON dspAddon = std::dynamic_pointer_cast<CActiveAEDSPAddon>(addon);
-        if (!dspAddon)
-        {
-          CLog::Log(LOGERROR, "CActiveAEDSP::UpdateAndInitialiseAddons - severe error, incorrect add type");
-          continue;
-        }
-
+        AE_DSP_ADDON dspAddon = std::make_shared<CActiveAEDSPAddon>(addonInfo);
         dspAddon.get()->Create(iAddonId);
         CSingleLock lock(m_critSection);
         // register the add-on
         if (m_addonMap.find(iAddonId) == m_addonMap.end())
         {
           m_addonMap.insert(std::make_pair(iAddonId, dspAddon));
-          m_addonNameIds.insert(make_pair(addon->ID(), iAddonId));
+          m_addonNameIds.insert(make_pair(addonInfo->ID(), iAddonId));
         }
       }
     }
-    else if (!bEnabled && IsKnownAudioDSPAddon(addon))
+    else if (!bEnabled && IsKnownAudioDSPAddon(addonInfo->ID()))
     {
-      CLog::Log(LOGDEBUG, "Disabling AudioDSP add-on: %s", addon->ID().c_str());
-      AE_DSP_ADDON dspAddon = std::dynamic_pointer_cast<CActiveAEDSPAddon>(addon);
+      CLog::Log(LOGDEBUG, "Disabling AudioDSP add-on: %s", addonInfo->ID().c_str());
 
       CSingleLock lock(m_critSection);
-      AE_DSP_ADDONMAP::iterator iter = m_addonMap.find(dspAddon->GetID());
+      AE_DSP_ADDONMAP::iterator iter = m_addonMap.find(GetAudioDSPAddonId(addonInfo->ID()));
       if (iter != m_addonMap.end())
       {
         m_addonMap.erase(iter);
@@ -711,7 +690,7 @@ int CActiveAEDSP::EnabledAudioDSPAddonAmount(void) const
 
   for (AE_DSP_ADDONMAP_CITR citr = m_addonMap.begin(); citr != m_addonMap.end(); ++citr)
   {
-    if (!CAddonMgr::GetInstance().IsAddonDisabled(citr->second->ID()))
+    if (!CServiceBroker::GetAddonMgr().IsAddonDisabled(citr->second->ID()))
       ++iReturn;
   }
 
@@ -730,7 +709,7 @@ int CActiveAEDSP::GetEnabledAudioDSPAddons(AE_DSP_ADDONMAP &addons) const
 
   for (AE_DSP_ADDONMAP_CITR citr = m_addonMap.begin(); citr != m_addonMap.end(); ++citr)
   {
-    if (!CAddonMgr::GetInstance().IsAddonDisabled(citr->second->ID()))
+    if (!CServiceBroker::GetAddonMgr().IsAddonDisabled(citr->second->ID()))
     {
       addons.insert(std::make_pair(citr->second->GetID(), citr->second));
       ++iReturn;
@@ -765,7 +744,7 @@ bool CActiveAEDSP::IsReadyAudioDSPAddon(int iAddonId) const
   return GetReadyAudioDSPAddon(iAddonId, addon);
 }
 
-bool CActiveAEDSP::IsReadyAudioDSPAddon(const AddonPtr &addon)
+bool CActiveAEDSP::IsReadyAudioDSPAddon(const BinaryAddonBasePtr &addon)
 {
   CSingleLock lock(m_critSection);
 
@@ -820,7 +799,7 @@ bool CActiveAEDSP::GetAudioDSPAddon(int iAddonId, AE_DSP_ADDON &addon) const
   return bReturn;
 }
 
-bool CActiveAEDSP::GetAudioDSPAddon(const std::string &strId, AddonPtr &addon) const
+bool CActiveAEDSP::GetAudioDSPAddon(const std::string &strId, AE_DSP_ADDON &addon) const
 {
   CSingleLock lock(m_critSection);
   for (AE_DSP_ADDONMAP_CITR citr = m_addonMap.begin(); citr != m_addonMap.end(); ++citr)
@@ -854,7 +833,7 @@ bool CActiveAEDSP::HaveMenuHooks(AE_DSP_MENUHOOK_CAT cat, int iDSPAddonID)
       else if (cat == AE_DSP_MENUHOOK_SETTING)
       {
         AddonPtr addon;
-        if (CAddonMgr::GetInstance().GetAddon(citr->second->ID(), addon) && addon->HasSettings())
+        if (CServiceBroker::GetAddonMgr().GetAddon(citr->second->ID(), addon) && addon->HasSettings())
           return true;
       }
     }

@@ -39,8 +39,7 @@ CVideoLibraryMarkWatchedJob::CVideoLibraryMarkWatchedJob(const CFileItemPtr &ite
     m_mark(mark)
 { }
 
-CVideoLibraryMarkWatchedJob::~CVideoLibraryMarkWatchedJob()
-{ }
+CVideoLibraryMarkWatchedJob::~CVideoLibraryMarkWatchedJob() = default;
 
 bool CVideoLibraryMarkWatchedJob::operator==(const CJob* job) const
 {
@@ -94,7 +93,7 @@ bool CVideoLibraryMarkWatchedJob::Work(CVideoDatabase &db)
     if (m_mark)
     {
       std::string path(item->GetPath());
-      if (item->HasVideoInfoTag())
+      if (item->HasVideoInfoTag() && !item->GetVideoInfoTag()->GetPath().empty())
         path = item->GetVideoInfoTag()->GetPath();
 
       db.ClearBookMarksOfFile(path, CBookmark::RESUME);

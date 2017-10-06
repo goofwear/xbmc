@@ -31,6 +31,7 @@
 #include "FileItem.h"
 #include "guilib/WindowIDs.h"
 #include "view/ViewStateSettings.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/SortUtils.h"
 
 using namespace XFILE;
@@ -43,7 +44,7 @@ std::string CGUIViewStateWindowVideo::GetLockType()
 
 std::string CGUIViewStateWindowVideo::GetExtensions()
 {
-  return g_advancedSettings.m_videoExtensions;
+  return CServiceBroker::GetFileExtensionProvider().GetVideoExtensions();
 }
 
 int CGUIViewStateWindowVideo::GetPlaylist()
@@ -271,6 +272,7 @@ CGUIViewStateWindowVideoNav::CGUIViewStateWindowVideoNav(const CFileItemList& it
         AddSortMethod(SortByYear, 562, LABEL_MASKS("%T", "%Y"));  // Title, Year | empty, empty
         AddSortMethod(SortByArtist, sortAttributes, 557, LABEL_MASKS("%A - %T", "%Y"));  // Artist - Title, Year | empty, empty
         AddSortMethod(SortByAlbum, sortAttributes, 558, LABEL_MASKS("%B - %T", "%Y"));  // Album - Title, Year | empty, empty
+        AddSortMethod(SortByDateAdded, 570, LABEL_MASKS("%T", "%a", "%T", "%a"));  // Title, DateAdded | Title, DateAdded
 
         if (CMediaSettings::GetInstance().GetWatchedMode(items.GetContent()) == WatchedModeAll)
           AddSortMethod(SortByPlaycount, 567, LABEL_MASKS("%T", "%V"));  // Title, Playcount | empty, empty

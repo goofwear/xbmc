@@ -19,13 +19,10 @@
  */
 #include "system.h"
 
-#if defined(HAS_GL)
-
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 #include "WinSystemX11GLContext.h"
-#include "GLContextGLX.h"
 #include "GLContextEGL.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -35,11 +32,22 @@
 #include <vector>
 #include "Application.h"
 #include "VideoSyncDRM.h"
-#include "VideoSyncGLX.h"
 
-CWinSystemX11GLContext::CWinSystemX11GLContext()
-{
-}
+#ifdef HAS_GLX
+#include "VideoSyncGLX.h"
+#include "GLContextGLX.h"
+#endif // HAS_GLX
+
+#include "cores/RetroPlayer/process/X11/RPProcessInfoX11.h"
+#include "cores/RetroPlayer/rendering/VideoRenderers/RPRendererOpenGL.h"
+#include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
+#include "cores/VideoPlayer/Process/X11/ProcessInfoX11.h"
+#include "cores/VideoPlayer/VideoRenderers/LinuxRendererGL.h"
+#include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
+
+using namespace KODI;
+
+CWinSystemX11GLContext::CWinSystemX11GLContext() = default;
 
 CWinSystemX11GLContext::~CWinSystemX11GLContext()
 {
@@ -50,7 +58,7 @@ void CWinSystemX11GLContext::PresentRenderImpl(bool rendered)
 {
   if (rendered)
     m_pGLContext->SwapBuffers();
-  
+
   if (m_delayDispReset && m_dispResetTimer.IsTimePast())
   {
     m_delayDispReset = false;
@@ -74,6 +82,7 @@ bool CWinSystemX11GLContext::IsExtSupported(const char* extension)
   return m_pGLContext->IsExtSupported(extension);
 }
 
+#ifdef HAS_GLX
 GLXWindow CWinSystemX11GLContext::GetWindow() const
 {
   return static_cast<CGLContextGLX*>(m_pGLContext)->m_glxWindow;
@@ -83,6 +92,7 @@ GLXContext CWinSystemX11GLContext::GetGlxContext() const
 {
   return static_cast<CGLContextGLX*>(m_pGLContext)->m_glxContext;
 }
+#endif // HAS_GLX
 
 EGLDisplay CWinSystemX11GLContext::GetEGLDisplay() const
 {
@@ -130,9 +140,9 @@ bool CWinSystemX11GLContext::SetWindow(int width, int height, bool fullscreen, c
   return true;
 }
 
-bool CWinSystemX11GLContext::CreateNewWindow(const std::string& name, bool fullScreen, RESOLUTION_INFO& res, PHANDLE_EVENT_FUNC userFunction)
+bool CWinSystemX11GLContext::CreateNewWindow(const std::string& name, bool fullScreen, RESOLUTION_INFO& res)
 {
-  if(!CWinSystemX11::CreateNewWindow(name, fullScreen, res, userFunction))
+  if(!CWinSystemX11::CreateNewWindow(name, fullScreen, res))
     return false;
 
   m_pGLContext->QueryExtensions();
@@ -143,7 +153,7 @@ bool CWinSystemX11GLContext::ResizeWindow(int newWidth, int newHeight, int newLe
 {
   m_newGlContext = false;
   CWinSystemX11::ResizeWindow(newWidth, newHeight, newLeft, newTop);
-  CRenderSystemGL::ResetRenderSystem(newWidth, newHeight, false, 0);
+  CRenderSystemGL::ResetRenderSystem(newWidth, newHeight);
 
   if (m_newGlContext)
     g_application.ReloadSkin();
@@ -155,7 +165,7 @@ bool CWinSystemX11GLContext::SetFullScreen(bool fullScreen, RESOLUTION_INFO& res
 {
   m_newGlContext = false;
   CWinSystemX11::SetFullScreen(fullScreen, res, blankOtherDisplays);
-  CRenderSystemGL::ResetRenderSystem(res.iWidth, res.iHeight, fullScreen, res.fRefreshRate);
+  CRenderSystemGL::ResetRenderSystem(res.iWidth, res.iHeight);
 
   if (m_newGlContext)
     g_application.ReloadSkin();
@@ -177,48 +187,85 @@ bool CWinSystemX11GLContext::DestroyWindow()
 
 XVisualInfo* CWinSystemX11GLContext::GetVisual()
 {
-  GLint att[] =
-  {
-    GLX_RGBA,
-    GLX_RED_SIZE, 8,
-    GLX_GREEN_SIZE, 8,
-    GLX_BLUE_SIZE, 8,
-    GLX_ALPHA_SIZE, 8,
-    GLX_DEPTH_SIZE, 24,
-    GLX_DOUBLEBUFFER,
-    None
-  };
-  return glXChooseVisual(m_dpy, m_nScreen, att);
+  int count = 0;
+  XVisualInfo vTemplate;
+  XVisualInfo *visual = nullptr;
+
+  int vMask = VisualScreenMask | VisualDepthMask | VisualClassMask;
+
+  vTemplate.screen = m_nScreen;
+  vTemplate.depth = 24;
+  vTemplate.c_class = TrueColor;
+
+  visual = XGetVisualInfo(m_dpy, vMask, &vTemplate, &count);
+
+  return visual;
 }
+
+#if defined (HAVE_LIBVA)
+#include <va/va_x11.h>
+#include "cores/VideoPlayer/DVDCodecs/Video/VAAPI.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/RendererVAAPIGL.h"
+#endif
+#if defined (HAVE_LIBVDPAU)
+#include "cores/VideoPlayer/DVDCodecs/Video/VDPAU.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/RendererVDPAU.h"
+#endif
 
 bool CWinSystemX11GLContext::RefreshGLContext(bool force)
 {
-  bool firstrun = false;
-  if (!m_pGLContext)
+  bool success = false;
+  if (m_pGLContext)
   {
-    m_pGLContext = new CGLContextEGL(m_dpy);
-    firstrun = true;
+    success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+    return success;
   }
-  bool ret = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
 
-  if (ret && !firstrun)
-    return ret;
+  VIDEOPLAYER::CProcessInfoX11::Register();
+  RETRO::CRPProcessInfoX11::Register();
+  RETRO::CRPProcessInfoX11::RegisterRendererFactory(new RETRO::CRendererFactoryOpenGL);
+  CDVDFactoryCodec::ClearHWAccels();
+  VIDEOPLAYER::CRendererFactory::ClearRenderer();
+  CLinuxRendererGL::Register();
 
-  std::string gpuvendor;
-  if (ret)
+  m_pGLContext = new CGLContextEGL(m_dpy);
+  success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+  if (success)
   {
+    std::string gpuvendor;
     const char* vend = (const char*) glGetString(GL_VENDOR);
     if (vend)
       gpuvendor = vend;
+    std::transform(gpuvendor.begin(), gpuvendor.end(), gpuvendor.begin(), ::tolower);
+    if (gpuvendor.compare(0, 5, "intel") == 0)
+    {
+#if defined (HAVE_LIBVA)
+      EGLDisplay eglDpy = static_cast<CGLContextEGL*>(m_pGLContext)->m_eglDisplay;
+      VADisplay vaDpy = GetVaDisplay();
+      bool general, hevc;
+      CRendererVAAPI::Register(vaDpy, eglDpy, general, hevc);
+      if (general)
+        VAAPI::CDecoder::Register(hevc);
+#endif
+      return success;
+    }
   }
-  std::transform(gpuvendor.begin(), gpuvendor.end(), gpuvendor.begin(), ::tolower);
-  if (firstrun && (!ret || gpuvendor.compare(0, 5, "intel") != 0))
+
+#ifdef HAS_GLX
+  delete m_pGLContext;
+
+  // fallback for vdpau
+  m_pGLContext = new CGLContextGLX(m_dpy);
+  success = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+  if (success)
   {
-    delete m_pGLContext;
-    m_pGLContext = new CGLContextGLX(m_dpy);
-    ret = m_pGLContext->Refresh(force, m_nScreen, m_glWindow, m_newGlContext);
+#if defined (HAVE_LIBVDPAU)
+    VDPAU::CDecoder::Register();
+    CRendererVDPAU::Register();
+#endif
   }
-  return ret;
+#endif // HAS_GLX
+  return success;
 }
 
 std::unique_ptr<CVideoSync> CWinSystemX11GLContext::GetVideoSync(void *clock)
@@ -229,11 +276,19 @@ std::unique_ptr<CVideoSync> CWinSystemX11GLContext::GetVideoSync(void *clock)
   {
     pVSync.reset(new CVideoSyncDRM(clock));
   }
+#ifdef HAS_GLX
   else if (dynamic_cast<CGLContextGLX*>(m_pGLContext))
   {
     pVSync.reset(new CVideoSyncGLX(clock));
   }
+#endif // HAS_GLX
   return pVSync;
 }
 
+void* CWinSystemX11GLContext::GetVaDisplay()
+{
+#if defined(HAVE_LIBVA)
+  return vaGetDisplay(m_dpy);
 #endif
+  return nullptr;
+}

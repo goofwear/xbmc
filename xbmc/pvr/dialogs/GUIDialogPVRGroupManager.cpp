@@ -18,23 +18,24 @@
  *
  */
 
+#include "GUIDialogPVRGroupManager.h"
+
 #include "FileItem.h"
-#include "dialogs/GUIDialogOK.h"
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "guilib/GUIKeyboardFactory.h"
 #include "guilib/GUIRadioButtonControl.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "input/Key.h"
-#include "ServiceBroker.h"
+#include "messaging/helpers//DialogOKHelper.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 
 #include "pvr/PVRManager.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 
-#include "GUIDialogPVRGroupManager.h"
-
+using namespace KODI::MESSAGING;
 using namespace PVR;
 
 #define CONTROL_LIST_CHANNELS_LEFT    11
@@ -116,7 +117,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonNewGroup(CGUIMessage &message)
       if (strGroupName != "")
       {
         /* add the group if it doesn't already exist */
-        CPVRChannelGroups *groups = ((CPVRChannelGroups *) CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio));
+        CPVRChannelGroups *groups = static_cast<CPVRChannelGroups*>(CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio));
         if (groups->AddGroup(strGroupName))
         {
           CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio)->GetByName(strGroupName)->SetGroupType(PVR_GROUP_TYPE_USER_DEFINED);
@@ -141,7 +142,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonDeleteGroup(CGUIMessage &message)
     if (!m_selectedGroup)
       return bReturn;
 
-    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>();
+    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
     if (!pDialog)
       return bReturn;
 
@@ -153,7 +154,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonDeleteGroup(CGUIMessage &message)
 
     if (pDialog->IsConfirmed())
     {
-      if (((CPVRChannelGroups *) CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio))->DeleteGroup(*m_selectedGroup))
+      if (static_cast<CPVRChannelGroups*>(CServiceBroker::GetPVRManager().ChannelGroups()->Get(m_bIsRadio))->DeleteGroup(*m_selectedGroup))
         Update();
     }
 
@@ -203,7 +204,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonUngroupedChannels(CGUIMessage &messa
     {
       if (m_channelGroups->GetFolderCount() == 0)
       {
-        CGUIDialogOK::ShowAndGetInput(CVariant{19033}, CVariant{19137});
+        HELPERS::ShowOKDialogText(CVariant{19033}, CVariant{19137});
       }
       else if (m_ungroupedChannels->GetFileCount() > 0)
       {
@@ -269,7 +270,7 @@ bool CGUIDialogPVRGroupManager::ActionButtonHideGroup(CGUIMessage &message)
 
   if (message.GetSenderId() == BUTTON_HIDE_GROUP && m_selectedGroup)
   {
-    CGUIRadioButtonControl *button = (CGUIRadioButtonControl*) GetControl(message.GetSenderId());
+    CGUIRadioButtonControl *button = static_cast<CGUIRadioButtonControl*>(GetControl(message.GetSenderId()));
     if (button)
     {
       m_selectedGroup->SetHidden(button->IsSelected());

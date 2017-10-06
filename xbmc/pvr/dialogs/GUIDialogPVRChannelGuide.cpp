@@ -18,17 +18,17 @@
  *
  */
 
+#include "GUIDialogPVRChannelGuide.h"
+
 #include "FileItem.h"
-#include "epg/Epg.h"
+#include "ServiceBroker.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
-#include "ServiceBroker.h"
 #include "view/ViewState.h"
 
 #include "pvr/PVRGUIActions.h"
 #include "pvr/PVRManager.h"
-
-#include "GUIDialogPVRChannelGuide.h"
+#include "pvr/epg/Epg.h"
 
 using namespace PVR;
 
@@ -40,9 +40,7 @@ CGUIDialogPVRChannelGuide::CGUIDialogPVRChannelGuide()
   m_vecItems.reset(new CFileItemList);
 }
 
-CGUIDialogPVRChannelGuide::~CGUIDialogPVRChannelGuide()
-{
-}
+CGUIDialogPVRChannelGuide::~CGUIDialogPVRChannelGuide() = default;
 
 bool CGUIDialogPVRChannelGuide::OnMessage(CGUIMessage& message)
 {

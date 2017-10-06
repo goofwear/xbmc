@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2012-2016 Team Kodi
+ *      Copyright (C) 2012-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -23,31 +23,33 @@
 
 #include <memory>
 
-class CDVDAudioCodec;
-class CProcessInfo;
 class IAEStream;
 
-namespace GAME
+namespace KODI
 {
-  class CRetroPlayerAudio : public IGameAudioCallback
+namespace RETRO
+{
+  class CRPProcessInfo;
+
+  class CRetroPlayerAudio : public GAME::IGameAudioCallback
   {
   public:
-    CRetroPlayerAudio(CProcessInfo& processInfo);
-    virtual ~CRetroPlayerAudio();
+    explicit CRetroPlayerAudio(CRPProcessInfo& processInfo);
+    ~CRetroPlayerAudio() override;
 
     // implementation of IGameAudioCallback
-    virtual unsigned int NormalizeSamplerate(unsigned int samplerate) const override;
-    virtual bool OpenPCMStream(AEDataFormat format, unsigned int samplerate, const CAEChannelInfo& channelLayout) override;
-    virtual bool OpenEncodedStream(AVCodecID codec, unsigned int samplerate, const CAEChannelInfo& channelLayout) override;
-    virtual void AddData(const uint8_t* data, unsigned int size) override;
-    virtual void CloseStream() override;
+    unsigned int NormalizeSamplerate(unsigned int samplerate) const override;
+    bool OpenPCMStream(AEDataFormat format, unsigned int samplerate, const CAEChannelInfo& channelLayout) override;
+    bool OpenEncodedStream(AVCodecID codec, unsigned int samplerate, const CAEChannelInfo& channelLayout) override;
+    void AddData(const uint8_t* data, unsigned int size) override;
+    void CloseStream() override;
 
     void Enable(bool bEnabled) { m_bAudioEnabled = bEnabled; }
 
   private:
-    CProcessInfo& m_processInfo;
+    CRPProcessInfo& m_processInfo;
     IAEStream* m_pAudioStream;
-    std::unique_ptr<CDVDAudioCodec> m_pAudioCodec;
     bool       m_bAudioEnabled;
   };
+}
 }

@@ -73,6 +73,7 @@ namespace PLAYLIST
 #ifdef HAS_PERFORMANCE_SAMPLE
 #include "utils/PerformanceStats.h"
 #endif
+#include "windowing/OSScreenSaver.h"
 #include "windowing/XBMC_events.h"
 #include "threads/Thread.h"
 
@@ -108,6 +109,14 @@ struct ReplayGainSettings
   int iPreAmp;
   int iNoGainPreAmp;
   int iType;
+  bool bAvoidClipping;
+};
+
+enum StartupAction
+{
+  STARTUP_ACTION_NONE = 0,
+  STARTUP_ACTION_PLAY_TV,
+  STARTUP_ACTION_PLAY_RADIO
 };
 
 class CApplication : public CXBApplicationEx, public IPlayerCallback, public IMsgTargetCallback,
@@ -128,13 +137,15 @@ public:
   };
 
   CApplication(void);
-  virtual ~CApplication(void);
-  virtual bool Initialize() override;
-  virtual void FrameMove(bool processEvents, bool processGUI = true) override;
-  virtual void Render() override;
+  ~CApplication(void) override;
+  bool Initialize() override;
+  void FrameMove(bool processEvents, bool processGUI = true) override;
+  void Render() override;
   virtual void Preflight();
-  bool Create();
-  virtual bool Cleanup() override;
+  bool Create(const CAppParamParser &params);
+  bool Cleanup() override;
+
+  bool IsInitialized() { return !m_bInitializing; }
 
   bool CreateGUI();
   bool InitWindow(RESOLUTION res = RES_INVALID);
@@ -146,32 +157,30 @@ public:
 
   bool IsCurrentThread() const;
   void Stop(int exitCode);
-  void RestartApp();
   void UnloadSkin(bool forReload = false);
-  bool LoadUserWindows();
+  bool LoadCustomWindows();
   void ReloadSkin(bool confirm = false);
   const std::string& CurrentFile();
   CFileItem& CurrentFileItem();
   std::shared_ptr<CFileItem> CurrentFileItemPtr();
-  void SetCurrentFileItem(const CFileItem &item);
   CFileItem& CurrentUnstackedItem();
-  virtual bool OnMessage(CGUIMessage& message) override;
+  bool OnMessage(CGUIMessage& message) override;
   std::string GetCurrentPlayer();
-  virtual void OnPlayBackEnded() override;
-  virtual void OnPlayBackStarted() override;
-  virtual void OnPlayBackPaused() override;
-  virtual void OnPlayBackResumed() override;
-  virtual void OnPlayBackStopped() override;
-  virtual void OnQueueNextItem() override;
-  virtual void OnPlayBackSeek(int iTime, int seekOffset) override;
-  virtual void OnPlayBackSeekChapter(int iChapter) override;
-  virtual void OnPlayBackSpeedChanged(int iSpeed) override;
+  void OnPlayBackEnded() override;
+  void OnPlayBackStarted(const CFileItem &file) override;
+  void OnPlayBackPaused() override;
+  void OnPlayBackResumed() override;
+  void OnPlayBackStopped() override;
+  void OnPlayBackError() override;
+  void OnQueueNextItem() override;
+  void OnPlayBackSeek(int64_t iTime, int64_t seekOffset) override;
+  void OnPlayBackSeekChapter(int iChapter) override;
+  void OnPlayBackSpeedChanged(int iSpeed) override;
 
-  virtual int  GetMessageMask() override;
-  virtual void OnApplicationMessage(KODI::MESSAGING::ThreadMessage* pMsg) override;
+  int  GetMessageMask() override;
+  void OnApplicationMessage(KODI::MESSAGING::ThreadMessage* pMsg) override;
 
   bool PlayMedia(const CFileItem& item, const std::string &player, int iPlaylist);
-  bool PlayMediaSync(const CFileItem& item, int iPlaylist);
   bool ProcessAndStartPlaylist(const std::string& strPlayList, PLAYLIST::CPlayList& playlist, int iPlaylist, int track=0);
   PlayBackRet PlayFile(CFileItem item, const std::string& player, bool bRestart = false);
   void SaveFileState(bool bForeground = false);
@@ -182,7 +191,6 @@ public:
   void DelayedPlayerRestart();
   void CheckDelayedPlayerRestart();
   bool IsPlayingFullScreenVideo() const;
-  bool IsStartingPlayback() const { return m_bPlaybackStarting; }
   bool IsFullScreen();
   bool OnAppCommand(const CAction &action);
   bool OnAction(const CAction &action);
@@ -196,7 +204,7 @@ public:
   void CloseNetworkShares();
 
   void ShowAppMigrationMessage();
-  virtual void Process() override;
+  void Process() override;
   void ProcessSlow();
   void ResetScreenSaver();
   float GetVolume(bool percentage = true) const;
@@ -273,7 +281,6 @@ public:
   void StartMusicArtistScan(const std::string& strDirectory, bool refresh = false);
 
   void UpdateLibraries();
-  void CheckMusicPlaylist();
 
   bool ExecuteXBMCAction(std::string action, const CGUIListItemPtr &item = NULL);
 
@@ -295,21 +302,11 @@ public:
   MEDIA_DETECT::CDetectDVDMedia m_DetectDVDType;
 #endif
 
-  inline bool IsInScreenSaver() { return m_bScreenSave; };
+  inline bool IsInScreenSaver() { return m_screensaverActive; };
+  inline std::string ScreensaverIdInUse() { return m_screensaverIdInUse; }
+
   inline bool IsDPMSActive() { return m_dpmsIsActive; };
   int m_iScreenSaveLock; // spiff: are we checking for a lock? if so, ignore the screensaver state, if -1 we have failed to input locks
-
-  bool m_bPlaybackStarting;
-  typedef enum
-  {
-    PLAY_STATE_NONE = 0,
-    PLAY_STATE_STARTING,
-    PLAY_STATE_PLAYING,
-    PLAY_STATE_STOPPED,
-    PLAY_STATE_ENDED,
-  } PlayState;
-  PlayState m_ePlayState;
-  CCriticalSection m_playStateMutex;
 
   std::string m_strPlayListFile;
 
@@ -357,8 +354,6 @@ public:
   void Minimize();
   bool ToggleDPMS(bool manual);
 
-  float GetDimScreenSaverLevel() const;
-
   bool SwitchToFullScreen(bool force = false);
 
   void SetRenderGUI(bool renderGUI) override;
@@ -395,16 +390,18 @@ public:
   void UnlockFrameMoveGuard();
 
 protected:
-  virtual bool OnSettingsSaving() const override;
+  bool OnSettingsSaving() const override;
 
-  virtual bool Load(const TiXmlNode *settings) override;
-  virtual bool Save(TiXmlNode *settings) const override;
+  bool Load(const TiXmlNode *settings) override;
+  bool Save(TiXmlNode *settings) const override;
 
-  virtual void OnSettingChanged(const CSetting *setting) override;
-  virtual void OnSettingAction(const CSetting *setting) override;
-  virtual bool OnSettingUpdate(CSetting* &setting, const char *oldSettingId, const TiXmlNode *oldSettingNode) override;
+  void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
+  void OnSettingAction(std::shared_ptr<const CSetting> setting) override;
+  bool OnSettingUpdate(std::shared_ptr<CSetting> setting, const char *oldSettingId, const TiXmlNode *oldSettingNode) override;
 
   bool LoadSkin(const std::string& skinID);
+
+  void CheckOSScreenSaverInhibitionSetting();
 
   /*!
    \brief Delegates the action to all registered action handlers.
@@ -426,8 +423,13 @@ protected:
   friend class CWinEventsAndroid;
 #endif
   // screensaver
-  bool m_bScreenSave;
-  ADDON::AddonPtr m_screenSaver;
+  bool m_screensaverActive;
+  std::string m_screensaverIdInUse;
+  ADDON::AddonPtr m_pythonScreenSaver; // @warning: Fallback for Python interface, for binaries not needed!
+  // OS screen saver inhibitor that is always active if user selected a Kodi screen saver
+  KODI::WINDOWING::COSScreenSaverInhibitor m_globalScreensaverInhibitor;
+  // Inhibitor that is active e.g. during video playback
+  KODI::WINDOWING::COSScreenSaverInhibitor m_screensaverInhibitor;
 
   // timer information
 #ifdef TARGET_WINDOWS
@@ -486,7 +488,6 @@ protected:
   void VolumeChanged() const;
 
   PlayBackRet PlayStack(const CFileItem& item, bool bRestart);
-  int  GetActiveWindowID(void);
 
   float NavigationIdleTime();
 
@@ -508,8 +509,6 @@ protected:
   ReplayGainSettings m_replayGainSettings;
   
   std::vector<IActionListener *> m_actionListeners;
-
-  bool m_fallbackLanguageLoaded;
 
   std::vector<std::string> m_incompatibleAddons;  /*!< Result of addon migration */
 

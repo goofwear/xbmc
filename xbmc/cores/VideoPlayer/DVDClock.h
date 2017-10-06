@@ -25,16 +25,6 @@
 #include <memory>
 #include <stdint.h>
 
-#define DVD_TIME_BASE 1000000
-#define DVD_NOPTS_VALUE 0xFFF0000000000000
-
-#define DVD_TIME_TO_MSEC(x) ((int)((double)(x) * 1000 / DVD_TIME_BASE))
-#define DVD_SEC_TO_TIME(x)  ((double)(x) * DVD_TIME_BASE)
-#define DVD_MSEC_TO_TIME(x) ((double)(x) * DVD_TIME_BASE / 1000)
-
-#define DVD_PLAYSPEED_PAUSE       0       // frame stepping
-#define DVD_PLAYSPEED_NORMAL      1000
-
 class CVideoReferenceClock;
 
 class CDVDClock
@@ -75,6 +65,7 @@ public:
   double GetVsyncAdjust();
 
   void Pause(bool pause);
+  void Advance(double time);
 
 protected:
   double SystemToAbsolute(int64_t system);

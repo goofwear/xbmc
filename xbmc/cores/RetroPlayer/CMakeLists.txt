@@ -1,18 +1,14 @@
-set(SOURCES PixelConverter.cpp
-            RetroPlayer.cpp
+set(SOURCES RetroPlayer.cpp
             RetroPlayerAudio.cpp
+            RetroPlayerAutoSave.cpp
+            RetroPlayerInput.cpp
             RetroPlayerVideo.cpp)
 
-set(HEADERS IPixelConverter.h
-            PixelConverter.h
-            RetroPlayer.h
+set(HEADERS RetroPlayer.h
             RetroPlayerAudio.h
-            RetroPlayerDefines.h
+            RetroPlayerAutoSave.h
+            RetroPlayerInput.h
+            RetroPlayerTypes.h
             RetroPlayerVideo.h)
-
-if(CORE_SYSTEM_NAME STREQUAL rbpi)
-  list(APPEND SOURCES PixelConverterRBP.cpp)
-  list(APPEND HEADERS PixelConverterRBP.h)
-endif()
 
 core_add_library(retroplayer)

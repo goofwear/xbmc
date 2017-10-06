@@ -89,7 +89,7 @@ class CGUIFontTTFBase
 
 public:
 
-  CGUIFontTTFBase(const std::string& strFileName);
+  explicit CGUIFontTTFBase(const std::string& strFileName);
   virtual ~CGUIFontTTFBase(void);
 
   void Clear();
@@ -202,8 +202,8 @@ protected:
 private:
   virtual bool FirstBegin() = 0;
   virtual void LastEnd() = 0;
-  CGUIFontTTFBase(const CGUIFontTTFBase&);
-  CGUIFontTTFBase& operator=(const CGUIFontTTFBase&);
+  CGUIFontTTFBase(const CGUIFontTTFBase&) = delete;
+  CGUIFontTTFBase& operator=(const CGUIFontTTFBase&) = delete;
   int m_referenceCount;
 };
 

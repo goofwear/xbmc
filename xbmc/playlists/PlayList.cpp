@@ -20,7 +20,6 @@
 
 #include "PlayList.h"
 #include "PlayListFactory.h"
-#include <sstream>
 #include "video/VideoInfoTag.h"
 #include "music/tags/MusicInfoTag.h"
 #include "filesystem/File.h"
@@ -95,10 +94,6 @@ void CPlayList::Add(const CFileItemPtr &item, int iPosition, int iOrder)
   else
     item->m_iprogramCount = iOrder;
 
-  // videodb files are not supported by the filesystem as yet
-  if (item->IsVideoDb())
-    item->SetPath(item->GetVideoInfoTag()->m_strFileNameAndPath);
-
   // increment the playable counter
   item->ClearProperty("unplayable");
   if (m_iPlayableItems < 0)
@@ -128,19 +123,19 @@ void CPlayList::Add(const CFileItemPtr &item)
   Add(item, -1, -1);
 }
 
-void CPlayList::Add(CPlayList& playlist)
+void CPlayList::Add(const CPlayList& playlist)
 {
   for (int i = 0; i < (int)playlist.size(); i++)
     Add(playlist[i], -1, -1);
 }
 
-void CPlayList::Add(CFileItemList& items)
+void CPlayList::Add(const CFileItemList& items)
 {
   for (int i = 0; i < (int)items.Size(); i++)
     Add(items[i]);
 }
 
-void CPlayList::Insert(CPlayList& playlist, int iPosition /* = -1 */)
+void CPlayList::Insert(const CPlayList& playlist, int iPosition /* = -1 */)
 {
   // out of bounds so just add to the end
   int iSize = size();
@@ -156,7 +151,7 @@ void CPlayList::Insert(CPlayList& playlist, int iPosition /* = -1 */)
   }
 }
 
-void CPlayList::Insert(CFileItemList& items, int iPosition /* = -1 */)
+void CPlayList::Insert(const CFileItemList& items, int iPosition /* = -1 */)
 {
   // out of bounds so just add to the end
   int iSize = size();

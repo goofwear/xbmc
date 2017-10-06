@@ -32,7 +32,7 @@
  */
 
 #include "Application.h"
-#include "DVDClock.h"
+#include "TimingConstants.h"
 #include "DVDStreamInfo.h"
 #include "GUIInfoManager.h"
 #include "GUIUserMessages.h"
@@ -537,7 +537,7 @@ bool CDVDRadioRDSData::CheckStream(CDVDStreamInfo &hints)
   return false;
 }
 
-bool CDVDRadioRDSData::OpenStream(CDVDStreamInfo &hints)
+bool CDVDRadioRDSData::OpenStream(CDVDStreamInfo hints)
 {
   m_messageQueue.Init();
   if (hints.type == STREAM_RADIO_RDS)
@@ -629,8 +629,7 @@ void CDVDRadioRDSData::ResetRDSCache()
   m_currentInfoTag = CPVRRadioRDSInfoTag::CreateDefaultTag();
   m_currentChannel = g_application.CurrentFileItem().GetPVRChannelInfoTag();
   g_application.CurrentFileItem().SetPVRRadioRDSInfoTag(m_currentInfoTag);
-  CFileItemPtr itemptr(new CFileItem(g_application.CurrentFileItem()));
-  g_infoManager.SetCurrentItem(itemptr);
+  g_infoManager.SetCurrentItem(g_application.CurrentFileItem());
 
   // send a message to all windows to tell them to update the radiotext
   CGUIMessage msg(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_RADIOTEXT);
@@ -663,7 +662,7 @@ void CDVDRadioRDSData::Process()
     {
       CSingleLock lock(m_critSection);
 
-      DemuxPacket* pPacket = ((CDVDMsgDemuxerPacket*)pMsg)->GetPacket();
+      DemuxPacket* pPacket = static_cast<CDVDMsgDemuxerPacket*>(pMsg)->GetPacket();
 
       ProcessUECP(pPacket->pData, pPacket->iSize);
     }
@@ -857,8 +856,7 @@ void CDVDRadioRDSData::ProcessUECP(const unsigned char *data, unsigned int len)
 
           if (m_currentFileUpdate && !m_bStop)
           {
-            CFileItemPtr itemptr(new CFileItem(g_application.CurrentFileItem()));
-            g_infoManager.SetCurrentItem(itemptr);
+            g_infoManager.SetCurrentItem(g_application.CurrentFileItem());
             m_currentFileUpdate = false;
           }
         }
@@ -906,28 +904,28 @@ unsigned int CDVDRadioRDSData::DecodeDI(uint8_t *msgElement)
 {
   bool value;
 
-  value = msgElement[3] & 1;
+  value = (msgElement[3] & 1) != 0;
   if (m_DI_IsStereo != value)
   {
     CLog::Log(LOGDEBUG, "Radio UECP (RDS) Processor - %s - Stream changed over to %s", __FUNCTION__, value ? "Stereo" : "Mono");
     m_DI_IsStereo = value;
   }
 
-  value = msgElement[3] & 2;
+  value = (msgElement[3] & 2) != 0;
   if (m_DI_ArtificialHead != value)
   {
     CLog::Log(LOGDEBUG, "Radio UECP (RDS) Processor - %s - Stream changed over to %sArtificial Head", __FUNCTION__, value ? "" : "Not ");
     m_DI_ArtificialHead = value;
   }
 
-  value = msgElement[3] & 4;
+  value = (msgElement[3] & 4) != 0;
   if (m_DI_ArtificialHead != value)
   {
     CLog::Log(LOGDEBUG, "Radio UECP (RDS) Processor - %s - Stream changed over to %sCompressed Head", __FUNCTION__, value ? "" : "Not ");
     m_DI_ArtificialHead = value;
   }
 
-  value = msgElement[3] & 8;
+  value = (msgElement[3] & 8) != 0;
   if (m_DI_DynamicPTY != value)
   {
     CLog::Log(LOGDEBUG, "Radio UECP (RDS) Processor - %s - Stream changed over to %s PTY", __FUNCTION__, value ? "dynamic" : "static");
@@ -940,8 +938,8 @@ unsigned int CDVDRadioRDSData::DecodeDI(uint8_t *msgElement)
 unsigned int CDVDRadioRDSData::DecodeTA_TP(uint8_t *msgElement)
 {
   uint8_t dsn = msgElement[1];
-  bool traffic_announcement = msgElement[3] & 1;
-  bool traffic_programme    = msgElement[3] & 2;
+  bool traffic_announcement = (msgElement[3] & 1) != 0;
+  bool traffic_programme    = (msgElement[3] & 2) != 0;
 
   if (traffic_announcement && !m_TA_TP_TrafficAdvisory && traffic_programme && dsn == 0 && CServiceBroker::GetSettings().GetBool("pvrplayback.trafficadvisory"))
   {
@@ -1162,7 +1160,7 @@ unsigned int CDVDRadioRDSData::DecodeRTC(uint8_t *msgElement)
 {
   uint8_t hours   = msgElement[UECP_CLOCK_HOURS];
   uint8_t minutes = msgElement[UECP_CLOCK_MINUTES];
-  bool    minus   = msgElement[UECP_CLOCK_LOCALOFFSET] & 0x20;
+  bool    minus   = (msgElement[UECP_CLOCK_LOCALOFFSET] & 0x20) != 0;
   if (minus)
   {
     if (msgElement[UECP_CLOCK_LOCALOFFSET] >> 1)

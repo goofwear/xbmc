@@ -20,19 +20,22 @@
 
 #include "PVRJobs.h"
 
+#include "PlayListPlayer.h"
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "events/EventLog.h"
 #include "events/NotificationEvent.h"
 #include "interfaces/AnnouncementManager.h"
+#ifdef TARGET_POSIX
+#include "linux/XTimeUtils.h"
+#endif
 
-#include "PlayListPlayer.h"
 #include "pvr/PVRGUIActions.h"
 #include "pvr/PVRManager.h"
 #include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/recordings/PVRRecordings.h"
 #include "pvr/timers/PVRTimers.h"
-#include "ServiceBroker.h"
 
 namespace PVR
 {
@@ -42,9 +45,47 @@ bool CPVRSetRecordingOnChannelJob::DoWork()
   return CServiceBroker::GetPVRManager().GUIActions()->SetRecordingOnChannel(m_channel, m_bOnOff);
 }
 
-bool CPVRContinueLastChannelJob::DoWork()
+CPVRChannelEntryTimeoutJob::CPVRChannelEntryTimeoutJob(int iTimeout)
 {
-  return CServiceBroker::GetPVRManager().GUIActions()->ContinueLastPlayedChannel();
+  m_delayTimer.Set(iTimeout);
+}
+
+bool CPVRChannelEntryTimeoutJob::DoWork()
+{
+  while (!ShouldCancel(0, 0))
+  {
+    if (m_delayTimer.IsTimePast())
+    {
+      CServiceBroker::GetPVRManager().GUIActions()->GetChannelNavigator().SwitchToCurrentChannel();
+      return true;
+    }
+    Sleep(10);
+  }
+  return false;
+}
+
+CPVRChannelInfoTimeoutJob::CPVRChannelInfoTimeoutJob(int iTimeout)
+{
+  m_delayTimer.Set(iTimeout);
+}
+
+bool CPVRChannelInfoTimeoutJob::DoWork()
+{
+  while (!ShouldCancel(0, 0))
+  {
+    if (m_delayTimer.IsTimePast())
+    {
+      CServiceBroker::GetPVRManager().GUIActions()->GetChannelNavigator().HideInfo();
+      return true;
+    }
+    Sleep(10);
+  }
+  return false;
+}
+
+bool CPVRPlayChannelOnStartupJob::DoWork()
+{
+  return CServiceBroker::GetPVRManager().GUIActions()->PlayChannelOnStartup();
 }
 
 CPVREventlogJob::CPVREventlogJob(bool bNotifyUser, bool bError, const std::string &label, const std::string &msg, const std::string &icon)
@@ -69,28 +110,6 @@ bool CPVREventlogJob::DoWork()
     CEventLog::GetInstance().Add(
       EventPtr(new CNotificationEvent(event.m_label, event.m_msg, event.m_icon, event.m_bError ? EventLevel::Error : EventLevel::Information)));
   }
-  return true;
-}
-
-bool CPVRChannelSwitchJob::DoWork(void)
-{
-  // announce OnStop and delete m_previous when done
-  if (m_previous)
-  {
-    CVariant data(CVariant::VariantTypeObject);
-    data["end"] = true;
-    ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Player, "xbmc", "OnStop", CFileItemPtr(m_previous), data);
-  }
-
-  // announce OnPlay if the switch was successful
-  if (m_next)
-  {
-    CVariant param;
-    param["player"]["speed"] = 1;
-    param["player"]["playerid"] = CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist();
-    ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::Player, "xbmc", "OnPlay", CFileItemPtr(new CFileItem(*m_next)), param);
-  }
-
   return true;
 }
 

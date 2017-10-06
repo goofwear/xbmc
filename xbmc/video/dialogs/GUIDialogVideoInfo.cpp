@@ -34,7 +34,6 @@
 #include "video/VideoInfoTag.h"
 #include "guilib/GUIKeyboardFactory.h"
 #include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogProgress.h"
@@ -57,6 +56,7 @@
 #include "filesystem/VideoDatabaseDirectory/QueryParams.h"
 #include "utils/FileUtils.h"
 #include "utils/Variant.h"
+#include "messaging/helpers/DialogOKHelper.h"
 
 #include <iterator>
 
@@ -190,7 +190,7 @@ bool CGUIDialogVideoInfo::OnMessage(CGUIMessage& message)
           OnSearch(directors[0]);
         else
         {
-          auto pDlgSelect = g_windowManager.GetWindow<CGUIDialogSelect>();
+          auto pDlgSelect = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
           if (pDlgSelect)
           {
             pDlgSelect->Reset();
@@ -306,6 +306,11 @@ void CGUIDialogVideoInfo::SetMovie(const CFileItem *item)
 
   // setup cast list
   ClearCastList();
+  
+  // When the scraper throws an error, the video tag can be null here
+  if (!item->HasVideoInfoTag())
+    return;
+  
   MediaType type = item->GetVideoInfoTag()->m_type;
 
   m_startUserrating = m_movieItem->GetVideoInfoTag()->m_iUserRating;
@@ -427,10 +432,10 @@ void CGUIDialogVideoInfo::Update()
   CONTROL_ENABLE(CONTROL_BTN_PLAY);
 
   // update the thumbnail
-  const CGUIControl* pControl = GetControl(CONTROL_IMAGE);
+  CGUIControl* pControl = GetControl(CONTROL_IMAGE);
   if (pControl)
   {
-    CGUIImage* pImageControl = (CGUIImage*)pControl;
+    CGUIImage* pImageControl = static_cast<CGUIImage*>(pControl);
     pImageControl->FreeResources();
     pImageControl->SetFileName(m_movieItem->GetArt("thumb"));
   }
@@ -455,7 +460,7 @@ bool CGUIDialogVideoInfo::RefreshAll() const
 
 void CGUIDialogVideoInfo::OnSearch(std::string& strSearch)
 {
-  CGUIDialogProgress *progress = g_windowManager.GetWindow<CGUIDialogProgress>();
+  CGUIDialogProgress *progress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
   if (progress)
   {
     progress->SetHeading(CVariant{194});
@@ -473,7 +478,7 @@ void CGUIDialogVideoInfo::OnSearch(std::string& strSearch)
 
   if (items.Size())
   {
-    CGUIDialogSelect* pDlgSelect = g_windowManager.GetWindow<CGUIDialogSelect>();
+    CGUIDialogSelect* pDlgSelect = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
     if (pDlgSelect)
     {
       pDlgSelect->Reset();
@@ -502,7 +507,7 @@ void CGUIDialogVideoInfo::OnSearch(std::string& strSearch)
   }
   else
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{194}, CVariant{284});
+    HELPERS::ShowOKDialogText(CVariant{194}, CVariant{284});
   }
 }
 
@@ -600,7 +605,7 @@ void CGUIDialogVideoInfo::Play(bool resume)
   CFileItem movie(*m_movieItem->GetVideoInfoTag());
   if (m_movieItem->GetVideoInfoTag()->m_strFileNameAndPath.empty())
     movie.SetPath(m_movieItem->GetPath());
-  CGUIWindowVideoNav* pWindow = g_windowManager.GetWindow<CGUIWindowVideoNav>();
+  CGUIWindowVideoNav* pWindow = g_windowManager.GetWindow<CGUIWindowVideoNav>(WINDOW_VIDEO_NAV);
   if (pWindow)
   {
     // close our dialog
@@ -620,7 +625,7 @@ void CGUIDialogVideoInfo::Play(bool resume)
 std::string CGUIDialogVideoInfo::ChooseArtType(const CFileItem &videoItem, std::map<std::string, std::string> &currentArt)
 {
   // prompt for choice
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (!dialog || !videoItem.HasVideoInfoTag())
     return "";
 
@@ -905,7 +910,7 @@ void CGUIDialogVideoInfo::OnGetFanart()
 
 void CGUIDialogVideoInfo::OnSetUserrating() const
 {
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog)
   {
     dialog->SetHeading(CVariant{ 38023 });
@@ -1145,7 +1150,7 @@ bool CGUIDialogVideoInfo::UpdateVideoItemTitle(const CFileItemPtr &pItem)
   // dont allow update while scanning
   if (g_application.IsVideoScanning())
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{14057});
+    HELPERS::ShowOKDialogText(CVariant{257}, CVariant{14057});
     return false;
   }
 
@@ -1234,11 +1239,11 @@ bool CGUIDialogVideoInfo::DeleteVideoItemFromDatabase(const CFileItemPtr &item, 
   // dont allow update while scanning
   if (g_application.IsVideoScanning())
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{14057});
+    HELPERS::ShowOKDialogText(CVariant{257}, CVariant{14057});
     return false;
   }
 
-  CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>();
+  CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
   if (pDialog == nullptr)
     return false;
   
@@ -1418,7 +1423,7 @@ bool CGUIDialogVideoInfo::GetMoviesForSet(const CFileItem *setItem, CFileItemLis
   if (!videodb.GetSortedVideos(MediaTypeMovie, "videodb://movies", SortDescription(), listItems) || listItems.Size() <= 0)
     return false;
 
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog == nullptr)
     return false;
 
@@ -1492,7 +1497,7 @@ bool CGUIDialogVideoInfo::GetSetForMovie(const CFileItem *movieItem, CFileItemPt
     listItems.AddFront(keepItem, 1);
   }
 
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog == nullptr)
     return false;
 
@@ -1599,7 +1604,7 @@ bool CGUIDialogVideoInfo::GetItemsForTag(const std::string &strHeading, const st
   if (!videodb.GetSortedVideos(mediaType, videoUrl.ToString(), SortDescription(), listItems, filter) || listItems.Size() <= 0)
     return false;
 
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog == nullptr)
     return false;
 
@@ -1879,7 +1884,7 @@ bool CGUIDialogVideoInfo::UpdateVideoItemSortTitle(const CFileItemPtr &pItem)
   // dont allow update while scanning
   if (g_application.IsVideoScanning())
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{14057});
+    HELPERS::ShowOKDialogText(CVariant{257}, CVariant{14057});
     return false;
   }
 
@@ -1955,7 +1960,7 @@ bool CGUIDialogVideoInfo::LinkMovieToTvShow(const CFileItemPtr &item, bool bRemo
   if (list.Size() > 1 || (!bRemove && !list.IsEmpty()))
   {
     list.Sort(SortByLabel, SortOrderAscending, CServiceBroker::GetSettings().GetBool(CSettings::SETTING_FILELISTS_IGNORETHEWHENSORTING) ? SortAttributeIgnoreArticle : SortAttributeNone);
-    CGUIDialogSelect* pDialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+    CGUIDialogSelect* pDialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
     if (pDialog)
     {
       pDialog->Reset();
@@ -2062,7 +2067,7 @@ bool CGUIDialogVideoInfo::OnGetFanart(const CFileItemPtr &videoItem)
 
 void CGUIDialogVideoInfo::ShowFor(const CFileItem& item)
 {
-  auto window = g_windowManager.GetWindow<CGUIWindowVideoNav>();
+  auto window = g_windowManager.GetWindow<CGUIWindowVideoNav>(WINDOW_VIDEO_NAV);
   if (window)
   {
     ADDON::ScraperPtr info;

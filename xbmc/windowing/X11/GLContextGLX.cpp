@@ -20,8 +20,6 @@
 
 #include "system_gl.h"
 
-#if defined(HAVE_X11) && defined(HAS_GL)
-
 #include <GL/glx.h>
 #include "GLContextGLX.h"
 #include "utils/log.h"
@@ -155,9 +153,7 @@ bool CGLContextGLX::IsSuitableVisual(XVisualInfo *vInfo)
     return false;
   if (glXGetConfig(m_dpy, vInfo, GLX_BLUE_SIZE, &value) || value < 8)
     return false;
-  if (glXGetConfig(m_dpy, vInfo, GLX_ALPHA_SIZE, &value) || value < 8)
-    return false;
-  if (glXGetConfig(m_dpy, vInfo, GLX_DEPTH_SIZE, &value) || value < 8)
+  if (glXGetConfig(m_dpy, vInfo, GLX_DEPTH_SIZE, &value) || value < 24)
     return false;
 
   return true;
@@ -295,5 +291,3 @@ void CGLContextGLX::QueryExtensions()
   else
     m_glXSwapIntervalEXT = NULL;
 }
-
-#endif

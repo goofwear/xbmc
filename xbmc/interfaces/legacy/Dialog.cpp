@@ -19,7 +19,6 @@
  */
 #include "LanguageHook.h"
 
-#include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogYesNo.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogContextMenu.h"
@@ -37,6 +36,7 @@
 #include "utils/Variant.h"
 #include "WindowException.h"
 #include "messaging/ApplicationMessenger.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "Dialog.h"
 #include "ListItem.h"
 #ifdef TARGET_POSIX
@@ -51,7 +51,7 @@ namespace XBMCAddon
 {
   namespace xbmcgui
   {
-    Dialog::~Dialog() {}
+    Dialog::~Dialog() = default;
 
     bool Dialog::yesno(const String& heading, const String& line1, 
                        const String& line2,
@@ -61,7 +61,7 @@ namespace XBMCAddon
                        int autoclose)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>();
+      CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
 
@@ -107,7 +107,7 @@ namespace XBMCAddon
     int Dialog::contextmenu(const std::vector<String>& list)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogContextMenu* pDialog= g_windowManager.GetWindow<CGUIDialogContextMenu>();
+      CGUIDialogContextMenu* pDialog= g_windowManager.GetWindow<CGUIDialogContextMenu>(WINDOW_DIALOG_CONTEXT_MENU);
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
 
@@ -123,7 +123,7 @@ namespace XBMCAddon
     int Dialog::select(const String& heading, const std::vector<Alternative<String, const ListItem* > > & list, int autoclose, int preselect, bool useDetails)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogSelect* pDialog= g_windowManager.GetWindow<CGUIDialogSelect>();
+      CGUIDialogSelect* pDialog= g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
 
@@ -151,7 +151,7 @@ namespace XBMCAddon
         const std::vector<Alternative<String, const ListItem* > > & options, int autoclose, const std::vector<int>& preselect, bool useDetails)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogSelect* pDialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+      CGUIDialogSelect* pDialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
       if (pDialog == nullptr)
         throw WindowException("Error: Window is NULL");
 
@@ -182,29 +182,14 @@ namespace XBMCAddon
                     const String& line3)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogOK* pDialog = g_windowManager.GetWindow<CGUIDialogOK>();
-      if (pDialog == NULL)
-        throw WindowException("Error: Window is NULL, this is not possible :-)");
-
-      if (!heading.empty())
-        pDialog->SetHeading(CVariant{heading});
-      if (!line1.empty())
-        pDialog->SetLine(0, CVariant{line1});
-      if (!line2.empty())
-        pDialog->SetLine(1, CVariant{line2});
-      if (!line3.empty())
-        pDialog->SetLine(2, CVariant{line3});
-
-      pDialog->Open();
-
-      return pDialog->IsConfirmed();
+      return HELPERS::ShowOKDialogLines(CVariant{heading}, CVariant{line1}, CVariant{line2}, CVariant{line3});
     }
 
     void Dialog::textviewer(const String& heading, const String& text)
     {
       DelayedCallGuard dcguard(languageHook);
 
-      CGUIDialogTextViewer* pDialog = g_windowManager.GetWindow<CGUIDialogTextViewer>();
+      CGUIDialogTextViewer* pDialog = g_windowManager.GetWindow<CGUIDialogTextViewer>(WINDOW_DIALOG_TEXT_VIEWER);
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
       if (!heading.empty())
@@ -447,7 +432,7 @@ namespace XBMCAddon
                                 const String& line3)
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogProgress* pDialog= g_windowManager.GetWindow<CGUIDialogProgress>();
+      CGUIDialogProgress* pDialog= g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
 
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
@@ -527,7 +512,7 @@ namespace XBMCAddon
     void DialogBusy::create()
     {
       DelayedCallGuard dcguard(languageHook);
-      CGUIDialogBusy* pDialog = g_windowManager.GetWindow<CGUIDialogBusy>();
+      CGUIDialogBusy* pDialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
 
       if (pDialog == nullptr)
         throw WindowException("Error: Window is NULL, this is not possible :-)");
@@ -583,7 +568,7 @@ namespace XBMCAddon
     {
       DelayedCallGuard dcguard(languageHook);
       CGUIDialogExtendedProgressBar* pDialog = 
-          g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>();
+          g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
 
       if (pDialog == NULL)
         throw WindowException("Error: Window is NULL, this is not possible :-)");

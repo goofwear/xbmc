@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -35,11 +35,11 @@ namespace KEYBOARD
   {
   public:
     CKeyboardEasterEgg(void);
-    virtual ~CKeyboardEasterEgg() = default;
+    ~CKeyboardEasterEgg() override = default;
 
     // implementation of IKeyboardHandler
-    virtual bool OnKeyPress(const CKey& key);
-    virtual void OnKeyRelease(const CKey& key) { }
+    bool OnKeyPress(const CKey& key) override;
+    void OnKeyRelease(const CKey& key) override { }
 
   private:
     static std::vector<XBMCVKey> m_sequence;

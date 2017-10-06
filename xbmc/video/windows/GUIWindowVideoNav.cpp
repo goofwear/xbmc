@@ -27,8 +27,8 @@
 #include "GUIPassword.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "filesystem/VideoDatabaseDirectory.h"
+#include "filesystem/VideoDatabaseFile.h"
 #include "view/GUIViewState.h"
-#include "dialogs/GUIDialogOK.h"
 #include "PartyModeManager.h"
 #include "music/MusicDatabase.h"
 #include "guilib/GUIWindowManager.h"
@@ -38,6 +38,7 @@
 #include "FileItem.h"
 #include "Application.h"
 #include "messaging/ApplicationMessenger.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "profiles/ProfilesManager.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/MediaSettings.h"
@@ -84,9 +85,7 @@ CGUIWindowVideoNav::CGUIWindowVideoNav(void)
   m_thumbLoader.SetObserver(this);
 }
 
-CGUIWindowVideoNav::~CGUIWindowVideoNav(void)
-{
-}
+CGUIWindowVideoNav::~CGUIWindowVideoNav(void) = default;
 
 bool CGUIWindowVideoNav::OnAction(const CAction &action)
 {
@@ -131,9 +130,60 @@ bool CGUIWindowVideoNav::OnMessage(CGUIMessage& message)
       if (!CGUIWindowVideoBase::OnMessage(message))
         return false;
 
-      // This needs to be done again, because the initialization of CGUIWindow overwrites it with default values
-      // Mostly affects cases where GUIWindowVideoNav is constructed and we're already in a show, e.g. entering from the homescreen
-      SelectFirstUnwatched();
+
+      if (message.GetStringParam(0) != "")
+      {
+        CURL url(message.GetStringParam(0));
+
+        int i = 0;
+        for (; i < m_vecItems->Size(); i++)
+        {
+          CFileItemPtr pItem = m_vecItems->Get(i);
+
+          // skip ".."
+          if (pItem->IsParentFolder())
+            continue;
+
+          if (URIUtils::PathEquals(pItem->GetPath(), message.GetStringParam(0), true, true))
+          {
+            m_viewControl.SetSelectedItem(i);
+            i = -1;
+            if (url.GetOption("showinfo") == "true")
+            {
+              ADDON::ScraperPtr scrapper;
+              OnItemInfo(*pItem, scrapper);
+            }
+            break;
+          }
+        }
+        if (i >= m_vecItems->Size())
+        {
+          SelectFirstUnwatched();
+
+          if (url.GetOption("showinfo") == "true")
+          {
+            // We are here if the item is filtered out in the nav window
+            std::string path = message.GetStringParam(0);
+            CFileItem item(path, URIUtils::HasSlashAtEnd(path));
+            if (item.IsVideoDb())
+            {
+              *(item.GetVideoInfoTag()) = XFILE::CVideoDatabaseFile::GetVideoTag(CURL(item.GetPath()));
+              if (!item.GetVideoInfoTag()->IsEmpty())
+              {
+                item.SetPath(item.GetVideoInfoTag()->m_strFileNameAndPath);
+                ADDON::ScraperPtr scrapper;
+                OnItemInfo(item, scrapper);
+              }
+            }
+          }
+        }
+      }
+      else
+      {
+        // This needs to be done again, because the initialization of CGUIWindow overwrites it with default values
+        // Mostly affects cases where GUIWindowVideoNav is constructed and we're already in a show, e.g. entering from the homescreen
+        SelectFirstUnwatched();
+      }
 
       return true;
     }
@@ -556,6 +606,13 @@ void CGUIWindowVideoNav::LoadVideoInfo(CFileItemList &items, CVideoDatabase &dat
   {
     CFileItemPtr pItem = items[i];
     CFileItemPtr match;
+
+    if (!content.empty() && pItem->m_bIsFolder && !pItem->IsParentFolder())
+    {
+      // we need this for enabling the right context menu entries, like mark watched / unwatched
+      pItem->SetProperty("IsVideoFolder", true);
+    }
+
     if (!content.empty()) /* optical media will be stacked down, so it's path won't match the base path */
     {
       std::string pathToMatch = pItem->IsOpticalMediaFile() ? pItem->GetLocalMetadataPath() : pItem->GetPath();
@@ -780,7 +837,7 @@ void CGUIWindowVideoNav::OnDeleteItem(CFileItemPtr pItem)
   else if (StringUtils::StartsWithNoCase(pItem->GetPath(), "videodb://movies/sets/") &&
            pItem->GetPath().size() > 22 && pItem->m_bIsFolder)
   {
-    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>();
+    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
     pDialog->SetHeading(CVariant{432});
     std::string strLabel = StringUtils::Format(g_localizeStrings.Get(433).c_str(),pItem->GetLabel().c_str());
     pDialog->SetLine(1, CVariant{std::move(strLabel)});
@@ -801,7 +858,7 @@ void CGUIWindowVideoNav::OnDeleteItem(CFileItemPtr pItem)
   }
   else if (m_vecItems->GetContent() == "tags" && pItem->m_bIsFolder)
   {
-    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>();
+    CGUIDialogYesNo* pDialog = g_windowManager.GetWindow<CGUIDialogYesNo>(WINDOW_DIALOG_YES_NO);
     pDialog->SetHeading(CVariant{432});
     pDialog->SetLine(1, CVariant{ StringUtils::Format(g_localizeStrings.Get(433).c_str(), pItem->GetLabel().c_str()) });
     pDialog->SetLine(2, CVariant{""});
@@ -1083,7 +1140,7 @@ bool CGUIWindowVideoNav::OnClick(int iItem, const std::string &player)
     }
     else
     {
-      CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{662});
+      HELPERS::ShowOKDialogText(CVariant{257}, CVariant{662});
       return true;
     }	  
   }
@@ -1092,7 +1149,7 @@ bool CGUIWindowVideoNav::OnClick(int iItem, const std::string &player)
     // dont allow update while scanning
     if (g_application.IsVideoScanning())
     {
-      CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{14057});
+      HELPERS::ShowOKDialogText(CVariant{257}, CVariant{14057});
       return true;
     }
 
@@ -1115,7 +1172,7 @@ bool CGUIWindowVideoNav::OnClick(int iItem, const std::string &player)
     if (!videodb.GetSingleValue("tag", "tag.tag_id", videodb.PrepareSQL("tag.name = '%s' AND tag.tag_id IN (SELECT tag_link.tag_id FROM tag_link WHERE tag_link.media_type = '%s')", strTag.c_str(), mediaType.c_str())).empty())
     {
       std::string strError = StringUtils::Format(g_localizeStrings.Get(20463).c_str(), strTag.c_str());
-      CGUIDialogOK::ShowAndGetInput(CVariant{20462}, CVariant{std::move(strError)});
+      HELPERS::ShowOKDialogText(CVariant{20462}, CVariant{std::move(strError)});
       return true;
     }
 

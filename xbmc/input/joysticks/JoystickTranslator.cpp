@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2015-2016 Team Kodi
+ *      Copyright (C) 2015-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -44,6 +44,31 @@ const char* CJoystickTranslator::HatStateToString(HAT_STATE state)
   }
 
   return "RELEASED";
+}
+
+const char* CJoystickTranslator::TranslateDirection(ANALOG_STICK_DIRECTION dir)
+{
+  switch (dir)
+  {
+  case ANALOG_STICK_DIRECTION::UP:    return "up";
+  case ANALOG_STICK_DIRECTION::DOWN:  return "down";
+  case ANALOG_STICK_DIRECTION::RIGHT: return "right";
+  case ANALOG_STICK_DIRECTION::LEFT:  return "left";
+  default:
+    break;
+  }
+
+  return "";
+}
+
+ANALOG_STICK_DIRECTION CJoystickTranslator::TranslateDirection(const std::string &dir)
+{
+  if (dir == "up")    return ANALOG_STICK_DIRECTION::UP;
+  if (dir == "down")  return ANALOG_STICK_DIRECTION::DOWN;
+  if (dir == "right") return ANALOG_STICK_DIRECTION::RIGHT;
+  if (dir == "left")  return ANALOG_STICK_DIRECTION::LEFT;
+
+  return ANALOG_STICK_DIRECTION::UNKNOWN;
 }
 
 SEMIAXIS_DIRECTION CJoystickTranslator::PositionToSemiAxisDirection(float position)

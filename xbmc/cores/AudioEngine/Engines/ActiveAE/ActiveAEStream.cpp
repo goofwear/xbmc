@@ -205,7 +205,7 @@ double CActiveAEStream::CalcResampleRatio(double error)
   double proportional = 0.0;
 
   double proportionaldiv = 2.0;
-  proportional = error / m_errorInterval / proportionaldiv;
+  proportional = error / GetErrorInterval() / proportionaldiv;
 
   double clockspeed = 1.0;
   if (m_pClock)
@@ -219,6 +219,15 @@ double CActiveAEStream::CalcResampleRatio(double error)
   double ret = 1.0 / clockspeed + proportional + m_resampleIntegral;
   //CLog::Log(LOGNOTICE,"----- error: %f, rr: %f, prop: %f, int: %f",
   //                    error, ret, proportional, m_resampleIntegral);
+  return ret;
+}
+
+int CActiveAEStream::GetErrorInterval()
+{
+  int ret = m_errorInterval;
+  double rr = m_processingBuffers->GetRR();
+  if (rr > 1.02 || rr < 0.98)
+    ret *= 3;
   return ret;
 }
 
@@ -363,7 +372,12 @@ double CActiveAEStream::GetCacheTime()
 
 double CActiveAEStream::GetCacheTotal()
 {
-  return m_activeAE->GetCacheTotal(this);
+  return m_activeAE->GetCacheTotal();
+}
+
+double CActiveAEStream::GetMaxDelay()
+{
+  return m_activeAE->GetMaxDelay();
 }
 
 void CActiveAEStream::Pause()
@@ -454,7 +468,6 @@ void CActiveAEStream::Flush()
     m_currentBuffer = NULL;
     m_leftoverBytes = 0;
     m_activeAE->FlushStream(this);
-    ResetFreeBuffers();
     m_streamIsFlushed = true;
   }
 }
@@ -536,22 +549,22 @@ bool CActiveAEStream::HasDSP()
   return false;
 }
 
-const unsigned int CActiveAEStream::GetFrameSize() const
+unsigned int CActiveAEStream::GetFrameSize() const
 {
   return m_format.m_frameSize;
 }
 
-const unsigned int CActiveAEStream::GetChannelCount() const
+unsigned int CActiveAEStream::GetChannelCount() const
 {
   return m_format.m_channelLayout.Count();
 }
 
-const unsigned int CActiveAEStream::GetSampleRate() const
+unsigned int CActiveAEStream::GetSampleRate() const
 {
   return m_format.m_sampleRate;
 }
 
-const enum AEDataFormat CActiveAEStream::GetDataFormat() const
+enum AEDataFormat CActiveAEStream::GetDataFormat() const
 {
   return m_format.m_dataFormat;
 }
@@ -574,7 +587,7 @@ void CActiveAEStream::RegisterSlave(IAEStream *slave)
 // CActiveAEStreamBuffers
 //------------------------------------------------------------------------------
 
-CActiveAEStreamBuffers::CActiveAEStreamBuffers(AEAudioFormat inputFormat, AEAudioFormat outputFormat, AEQuality quality)
+CActiveAEStreamBuffers::CActiveAEStreamBuffers(const AEAudioFormat& inputFormat, const AEAudioFormat& outputFormat, AEQuality quality)
 {
   m_inputFormat = inputFormat;
   m_resampleBuffers = new CActiveAEBufferPoolResample(inputFormat, outputFormat, quality);

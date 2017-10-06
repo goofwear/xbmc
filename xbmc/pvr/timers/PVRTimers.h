@@ -23,19 +23,17 @@
 #include <memory>
 #include <vector>
 
-#include "addons/kodi-addon-dev-kit/include/kodi/xbmc_pvr_types.h"
-#include "PVRTimerInfoTag.h"
-#include "utils/Observer.h"
 #include "XBDateTime.h"
+#include "addons/kodi-addon-dev-kit/include/kodi/xbmc_pvr_types.h"
+#include "utils/Observer.h"
+
+#include "pvr/PVRSettings.h"
+#include "pvr/PVRTypes.h"
+#include "pvr/timers/PVRTimerInfoTag.h"
 
 class CFileItem;
 class CFileItemList;
 typedef std::shared_ptr<CFileItem> CFileItemPtr;
-
-namespace EPG
-{
-  class CEpgInfoTag;
-}
 
 namespace PVR
 {
@@ -72,6 +70,8 @@ namespace PVR
     const MapTags& GetTags() const { return m_tags; }
 
   protected:
+    void InsertTimer(const CPVRTimerInfoTagPtr &newTimer);
+
     CCriticalSection m_critSection;
     unsigned int m_iLastId;
     MapTags m_tags;
@@ -81,7 +81,7 @@ namespace PVR
   {
   public:
     CPVRTimers(void);
-    virtual ~CPVRTimers(void);
+    ~CPVRTimers(void) override;
 
     /**
      * (re)load the timers from the clients.
@@ -241,7 +241,7 @@ namespace PVR
      * @param epgTag The epg tag.
      * @return The requested timer tag, or an empty fileitemptr if none was found.
      */
-    CPVRTimerInfoTagPtr GetTimerForEpgTag(const EPG::CEpgInfoTagPtr &epgTag) const;
+    CPVRTimerInfoTagPtr GetTimerForEpgTag(const CPVREpgInfoTagPtr &epgTag) const;
 
     /*!
      * @brief Check whether there is a timer currently recording the given recording.
@@ -249,6 +249,13 @@ namespace PVR
      * @return true if there is a timer currently recording the given recording, false otherwise.
      */
     bool HasRecordingTimerForRecording(const CPVRRecording &recording) const;
+
+    /*!
+     * @brief Get the timer currently recording the given recording, if any.
+     * @param recording The recording to check.
+     * @return The requested timer tag, or an null if none was found.
+     */
+    CPVRTimerInfoTagPtr GetRecordingTimerForRecording(const CPVRRecording &recording) const;
 
     /*!
      * Get the timer rule for a given timer tag
@@ -269,7 +276,7 @@ namespace PVR
      */
     void UpdateChannels(void);
 
-    void Notify(const Observable &obs, const ObservableMessage msg);
+    void Notify(const Observable &obs, const ObservableMessage msg) override;
 
     /*!
      * Get a timer tag given it's unique ID
@@ -301,6 +308,7 @@ namespace PVR
     int AmountActiveRecordings(const TimerKind &eKind) const;
 
     bool m_bIsUpdating;
+    CPVRSettings m_settings;
   };
 
   class CPVRTimersPath
@@ -309,7 +317,7 @@ namespace PVR
     static const std::string PATH_ADDTIMER;
     static const std::string PATH_NEW;
 
-    CPVRTimersPath(const std::string &strPath);
+    explicit CPVRTimersPath(const std::string &strPath);
     CPVRTimersPath(const std::string &strPath, int iClientId, unsigned int iParentId);
     CPVRTimersPath(bool bRadio, bool bTimerRules);
 

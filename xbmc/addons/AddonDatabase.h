@@ -31,8 +31,8 @@ class CAddonDatabase : public CDatabase
 {
 public:
   CAddonDatabase();
-  virtual ~CAddonDatabase();
-  virtual bool Open();
+  ~CAddonDatabase() override;
+  bool Open() override;
 
   /*! @deprecated: use CAddonMgr::FindInstallableById */
   bool GetAddon(const std::string& addonID, ADDON::AddonPtr& addon);
@@ -68,7 +68,12 @@ public:
   /*! Get addons across all repositories */
   bool GetRepositoryContent(ADDON::VECADDONS& addons);
 
-  bool SetLastChecked(const std::string& id, const ADDON::AddonVersion& version, const std::string& timestamp);
+  /*!
+   \brief Set repo last checked date, and create the repo if needed
+   \param id id of the repository
+   \returns id of the repository, or -1 on error.
+   */
+  int SetLastChecked(const std::string& id, const ADDON::AddonVersion& version, const std::string& timestamp);
 
   /*!
    \brief Retrieve the time a repository was last checked and the version it was for
@@ -146,12 +151,12 @@ public:
 
 
 protected:
-  virtual void CreateTables();
-  virtual void CreateAnalytics();
-  virtual void UpdateTables(int version);
-  virtual int GetMinSchemaVersion() const;
-  virtual int GetSchemaVersion() const;
-  const char *GetBaseDBName() const { return "Addons"; }
+  void CreateTables() override;
+  void CreateAnalytics() override;
+  void UpdateTables(int version) override;
+  int GetMinSchemaVersion() const override;
+  int GetSchemaVersion() const override;
+  const char *GetBaseDBName() const override { return "Addons"; }
 
   bool GetAddon(int id, ADDON::AddonPtr& addon);
   void DeleteRepository(const std::string& id);

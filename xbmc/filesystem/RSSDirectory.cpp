@@ -30,6 +30,7 @@
 #include "settings/Settings.h"
 #include "threads/SingleLock.h"
 #include "URL.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/HTMLUtil.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
@@ -71,13 +72,9 @@ namespace {
 std::map<std::string,CDateTime> CRSSDirectory::m_cache;
 CCriticalSection CRSSDirectory::m_section;
 
-CRSSDirectory::CRSSDirectory()
-{
-}
+CRSSDirectory::CRSSDirectory() = default;
 
-CRSSDirectory::~CRSSDirectory()
-{
-}
+CRSSDirectory::~CRSSDirectory() = default;
 
 bool CRSSDirectory::ContainsFiles(const CURL& url)
 {
@@ -91,9 +88,9 @@ bool CRSSDirectory::ContainsFiles(const CURL& url)
 static bool IsPathToMedia(const std::string& strPath )
 {
   return URIUtils::HasExtension(strPath,
-                              g_advancedSettings.m_videoExtensions + '|' +
-                              g_advancedSettings.GetMusicExtensions() + '|' +
-                              g_advancedSettings.GetPictureExtensions());
+                                CServiceBroker::GetFileExtensionProvider().GetVideoExtensions() + '|' +
+                                CServiceBroker::GetFileExtensionProvider().GetMusicExtensions() + '|' +
+                                CServiceBroker::GetFileExtensionProvider().GetPictureExtensions());
 }
 
 static bool IsPathToThumbnail(const std::string& strPath )
@@ -101,7 +98,7 @@ static bool IsPathToThumbnail(const std::string& strPath )
   // Currently just check if this is an image, maybe we will add some
   // other checks later
   return URIUtils::HasExtension(strPath,
-                                    g_advancedSettings.GetPictureExtensions());
+                                CServiceBroker::GetFileExtensionProvider().GetPictureExtensions());
 }
 
 static time_t ParseDate(const std::string & strDate)

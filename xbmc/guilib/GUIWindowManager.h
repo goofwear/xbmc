@@ -30,7 +30,6 @@
 
 #include <list>
 #include <utility>
-#include <typeindex>
 #include <unordered_map>
 #include <vector>
 
@@ -66,8 +65,8 @@ class CGUIWindowManager : public KODI::MESSAGING::IMessageTarget
   friend CGUIDialog;
   friend CGUIMediaWindow;
 public:
-  CGUIWindowManager(void);
-  virtual ~CGUIWindowManager(void);
+  CGUIWindowManager();
+  ~CGUIWindowManager() override;
   bool SendMessage(CGUIMessage& message);
   bool SendMessage(int message, int senderID, int destID, int param1 = 0, int param2 = 0);
   bool SendMessage(CGUIMessage& message, int window);
@@ -86,8 +85,8 @@ public:
   void CloseDialogs(bool forceClose = false) const;
   void CloseInternalModalDialogs(bool forceClose = false) const;
 
-  virtual void OnApplicationMessage(KODI::MESSAGING::ThreadMessage* pMsg) override;
-  virtual int GetMessageMask() override;
+  void OnApplicationMessage(KODI::MESSAGING::ThreadMessage* pMsg) override;
+  int GetMessageMask() override;
 
   // OnAction() runs through our active dialogs and windows and sends the message
   // off to the callbacks (application, python, playlist player) and to the
@@ -105,10 +104,6 @@ public:
   /*! \brief Mark a region as dirty, forcing a redraw at the next Render()
    */
   void MarkDirty(const CRect& rect);
-
-  /*! \brief Get the current dirty region
-   */
-  CDirtyRegionList GetDirty() { return m_tracker.GetDirtyRegions(); }
 
   /*! \brief Rendering of the current window and any dialogs
    Render is called every frame to draw the current window and any dialogs.
@@ -152,13 +147,15 @@ public:
    */
   void DestroyWindow(int id);
 
-  /*! \brief Return the window for the given type \code{T}.
+  /*! \brief Return the window of type \code{T} with the given id or
+   * null if no window exists with the given id.
    *
    * \tparam T the window class type
+   * \param id the window id
    * \return the window with for the given type \code{T} or null
    */
   template<typename T, typename std::enable_if<std::is_base_of<CGUIWindow,T>::value>::type* = nullptr>
-  T* GetWindow() const { return dynamic_cast<T *>(GetWindow(std::type_index(typeid(T)))); };
+  T* GetWindow(int id) const { return dynamic_cast<T *>(GetWindow(id)); };
 
   /*! \brief Return the window with the given id or null.
    *
@@ -192,7 +189,7 @@ public:
   int RemoveThreadMessageByMessageIds(int *pMessageIDList);
   void AddMsgTarget( IMsgTargetCallback* pMsgTarget );
   int GetActiveWindow() const;
-  int GetActiveWindowID();
+  int GetActiveWindowID() const;
   int GetFocusedWindow() const;
   bool HasModalDialog(const std::vector<DialogModalityType>& types = std::vector<DialogModalityType>(), bool ignoreClosing = true) const;
   bool HasVisibleModalDialog(const std::vector<DialogModalityType>& types = std::vector<DialogModalityType>()) const;
@@ -213,7 +210,9 @@ public:
    * \return true if the given window is a python window, otherwise false.
    */
   bool IsPythonWindow(int id) const { return (id >= WINDOW_PYTHON_START && id <= WINDOW_PYTHON_END); };
-  void GetActiveModelessWindows(std::vector<int> &ids);
+
+  bool HasVisibleControls();
+
 #ifdef _DEBUG
   void DumpTextureUse();
 #endif
@@ -223,11 +222,18 @@ private:
   void LoadNotOnDemandWindows();
   void UnloadNotOnDemandWindows();
   void AddToWindowHistory(int newWindowID);
+
+  /*!
+   \brief Check if the given window id is in the window history, and if so, remove this
+    window and all overlying windows from the history so that we always have a predictable
+    "Back" behaviour for each window.
+
+   \param windowID the window id to remove from the window history
+   */
+  void RemoveFromWindowHistory(int windowID);
   void ClearWindowHistory();
   void CloseWindowSync(CGUIWindow *window, int nextWindowID = 0);
   CGUIWindow *GetTopMostDialog() const;
-
-  CGUIWindow* GetWindow(std::type_index type) const;
 
   friend class KODI::MESSAGING::CApplicationMessenger;
   
@@ -242,8 +248,9 @@ private:
 
   void ProcessRenderLoop(bool renderOnly = false);
 
+  bool HandleAction(const CAction &action) const;
+
   std::unordered_map<int, CGUIWindow*> m_mapWindows;
-  std::unordered_map<std::type_index, CGUIWindow*> m_mapWindowTypes;
   std::vector<CGUIWindow*> m_vecCustomWindows;
   std::vector<CGUIWindow*> m_activeDialogs;
   std::vector<CGUIWindow*> m_deleteWindows;
@@ -257,7 +264,10 @@ private:
 
   int  m_iNested;
   bool m_initialized;
+  mutable bool m_touchGestureActive{false};
+  mutable bool m_inhibitTouchGestureEvents{false};
 
+  CDirtyRegionList m_dirtyregions;
   CDirtyRegionTracker m_tracker;
 };
 

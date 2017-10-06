@@ -33,13 +33,9 @@
 using namespace XFILE;
 using namespace MUSICDATABASEDIRECTORY;
 
-CMusicDatabaseDirectory::CMusicDatabaseDirectory(void)
-{
-}
+CMusicDatabaseDirectory::CMusicDatabaseDirectory(void) = default;
 
-CMusicDatabaseDirectory::~CMusicDatabaseDirectory(void)
-{
-}
+CMusicDatabaseDirectory::~CMusicDatabaseDirectory(void) = default;
 
 bool CMusicDatabaseDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 {
@@ -125,7 +121,9 @@ void CMusicDatabaseDirectory::ClearDirectoryCache(const std::string& strDirector
 
 bool CMusicDatabaseDirectory::IsAllItem(const std::string& strDirectory)
 {
-  if (StringUtils::EndsWith(strDirectory, "/-1/"))
+  //Last query parameter, ignoring any appended options, is -1
+  CURL url(strDirectory);
+  if (StringUtils::EndsWith(url.GetWithoutOptions(), "/-1/"))
     return true;
   return false;
 }

@@ -24,24 +24,46 @@
 #include <memory>
 #include <string>
 
+namespace PERIPHERALS
+{
+  class CPeripherals;
+}
+
+namespace KODI
+{
+namespace RETRO
+{
+  class CGUIGameRenderManager;
+}
+
 namespace GAME
 {
   class CControllerManager;
+  class CPortManager;
 
   class CGameServices
   {
   public:
-    CGameServices();
+    CGameServices(CControllerManager &controllerManager,
+                  RETRO::CGUIGameRenderManager &renderManager,
+                  PERIPHERALS::CPeripherals &peripheralManager);
     ~CGameServices();
-
-    void Init() { }
-    void Deinit() { }
 
     ControllerPtr GetController(const std::string& controllerId);
     ControllerPtr GetDefaultController();
     ControllerVector GetControllers();
 
+    CPortManager& PortManager();
+
+    RETRO::CGUIGameRenderManager &GameRenderManager() { return m_gameRenderManager; }
+
   private:
-    std::unique_ptr<CControllerManager> m_controllerManager;
+    // Construction parameters
+    CControllerManager &m_controllerManager;
+    RETRO::CGUIGameRenderManager &m_gameRenderManager;
+
+    // Game services
+    std::unique_ptr<CPortManager> m_portManager;
   };
+}
 }

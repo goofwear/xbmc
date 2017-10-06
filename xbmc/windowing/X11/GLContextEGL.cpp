@@ -19,20 +19,14 @@
  */
 #include "system.h"
 
-#if defined(HAVE_X11) && defined(HAS_EGL)
-
-#ifdef HAS_GL
-  // always define GL_GLEXT_PROTOTYPES before include gl headers
-  #if !defined(GL_GLEXT_PROTOTYPES)
-    #define GL_GLEXT_PROTOTYPES
-  #endif
-  #include <GL/gl.h>
-  #include <GL/glu.h>
-  #include <GL/glext.h>
-#elif HAS_GLES == 2
-  #include <GLES2/gl2.h>
-  #include <GLES2/gl2ext.h>
+// always define GL_GLEXT_PROTOTYPES before include gl headers
+#if !defined(GL_GLEXT_PROTOTYPES)
+  #define GL_GLEXT_PROTOTYPES
 #endif
+
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glext.h>
 
 #include "GLContextEGL.h"
 #include "utils/log.h"
@@ -174,14 +168,12 @@ bool CGLContextEGL::Refresh(bool force, int screen, Window glWindow, bool &newCo
       return false;
     }
 
-#if defined (HAS_GL)
     if (!eglBindAPI(EGL_OPENGL_API))
     {
       CLog::Log(LOGERROR, "failed to initialize egl");
       XFree(vInfo);
       return false;
     }
-#endif
 
     if(m_eglConfig == EGL_NO_CONFIG)
     {
@@ -371,52 +363,3 @@ void CGLContextEGL::QueryExtensions()
 
   CLog::Log(LOGDEBUG, "EGL_EXTENSIONS:%s", m_extensions.c_str());
 }
-
-XVisualInfo* CGLContextEGL::GetVisual()
-{
-    GLint att[] =
-    {
-      EGL_RED_SIZE, 8,
-      EGL_GREEN_SIZE, 8,
-      EGL_BLUE_SIZE, 8,
-      EGL_ALPHA_SIZE, 8,
-      EGL_BUFFER_SIZE, 32,
-      EGL_DEPTH_SIZE, 24,
-      EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-      EGL_NONE
-    };
-
-    if (m_eglDisplay == EGL_NO_DISPLAY)
-    {
-      m_eglDisplay = eglGetDisplay((EGLNativeDisplayType)m_dpy);
-      if (m_eglDisplay == EGL_NO_DISPLAY)
-      {
-        CLog::Log(LOGERROR, "failed to get egl display\n");
-	return NULL;
-      }
-      if (!eglInitialize(m_eglDisplay, NULL, NULL))
-      {
-	CLog::Log(LOGERROR, "failed to initialize egl display\n");
-	return NULL;
-      }
-    }
-
-    EGLint numConfigs;
-    EGLConfig eglConfig = 0;
-    if (!eglChooseConfig(m_eglDisplay, att, &eglConfig, 1, &numConfigs) || numConfigs == 0) {
-      CLog::Log(LOGERROR, "Failed to choose a config %d\n", eglGetError());
-    }
-    m_eglConfig=eglConfig;
-
-    XVisualInfo x11_visual_info_template;
-    if (!eglGetConfigAttrib(m_eglDisplay, m_eglConfig, EGL_NATIVE_VISUAL_ID, (EGLint*)&x11_visual_info_template.visualid)) {
-      CLog::Log(LOGERROR, "Failed to query native visual id\n");
-    }
-    int num_visuals;
-    return XGetVisualInfo(m_dpy,
-                        VisualIDMask,
-			&x11_visual_info_template,
-			&num_visuals);
-}
-
-#endif

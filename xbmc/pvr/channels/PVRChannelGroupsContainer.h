@@ -21,22 +21,14 @@
 
 #include "threads/CriticalSection.h"
 
-#include "PVRChannelGroups.h"
+#include "pvr/channels/PVRChannelGroups.h"
 
 class CURL;
 
 namespace PVR
 {
-  class CPVRManager;
-  class CPVRChannelsUpdateJob;
-  class CPVRChannelGroupsUpdateJob;
-
   class CPVRChannelGroupsContainer
   {
-    friend class CPVRManager;
-    friend class CPVRChannelsUpdateJob;
-    friend class CPVRChannelGroupsUpdateJob;
-
   public:
     /*!
      * @brief Create a new container for all channel groups
@@ -64,6 +56,13 @@ namespace PVR
      * @brief Unload and destruct all channel groups and all channels in them.
      */
     void Unload(void);
+
+    /*!
+     * @brief Update the contents of all the groups in this container.
+     * @param bChannelsOnly Set to true to only update channels, not the groups themselves.
+     * @return True if the update was successful, false otherwise.
+     */
+    bool Update(bool bChannelsOnly = false);
 
     /*!
      * @brief Get the TV channel groups.
@@ -200,13 +199,6 @@ namespace PVR
     void SetLastPlayedGroup(const CPVRChannelGroupPtr &group);
 
   protected:
-    /*!
-     * @brief Update the contents of all the groups in this container.
-     * @param bChannelsOnly Set to true to only update channels, not the groups themselves.
-     * @return True if the update was successful, false otherwise.
-     */
-    bool Update(bool bChannelsOnly = false);
-
     CPVRChannelGroups *m_groupsRadio; /*!< all radio channel groups */
     CPVRChannelGroups *m_groupsTV;    /*!< all TV channel groups */
     CCriticalSection   m_critSection;
@@ -215,8 +207,8 @@ namespace PVR
     CPVRChannelGroupPtr m_lastPlayedGroups[2]; /*!< used to store the last played groups */
 
   private :
-    CPVRChannelGroupsContainer& operator=(const CPVRChannelGroupsContainer&);
-    CPVRChannelGroupsContainer(const CPVRChannelGroupsContainer&);
+    CPVRChannelGroupsContainer& operator=(const CPVRChannelGroupsContainer&) = delete;
+    CPVRChannelGroupsContainer(const CPVRChannelGroupsContainer&) = delete;
 
     bool FilterDirectory(const CURL &url, CFileItemList &results) const;
 

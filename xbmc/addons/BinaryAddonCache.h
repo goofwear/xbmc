@@ -36,6 +36,8 @@ public:
   void Init();
   void Deinit();
   void GetAddons(VECADDONS& addons, const TYPE& type);
+  void GetDisabledAddons(VECADDONS& addons, const TYPE& type);
+  void GetInstalledAddons(VECADDONS& addons, const TYPE& type);
   AddonPtr GetAddonInstance(const std::string& strId, TYPE type);
 
 protected:
@@ -44,7 +46,6 @@ protected:
   
   CCriticalSection m_critSection;
   std::multimap<TYPE, VECADDONS> m_addons;
-  std::vector<TYPE> m_addonsToCache;
 };
 
 }

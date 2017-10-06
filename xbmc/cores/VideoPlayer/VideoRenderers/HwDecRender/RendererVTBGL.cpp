@@ -19,23 +19,31 @@
  */
 
 #include "RendererVTBGL.h"
-
-#if defined(TARGET_DARWIN_OSX)
-
+#include "../RenderFactory.h"
 #include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
+#include "cores/VideoPlayer/DVDCodecs/Video/VTB.h"
 #include "utils/log.h"
 #include "platform/darwin/osx/CocoaInterface.h"
 #include <CoreVideo/CoreVideo.h>
 #include <OpenGL/CGLIOSurface.h>
 #include "windowing/WindowingFactory.h"
 
-struct CVTBData
+CBaseRenderer* CRendererVTB::Create(CVideoBuffer *buffer)
 {
-  struct __CVBuffer* m_vtbbuf;
-  GLuint m_fence;
-};
+  VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buffer);
+  if (vb)
+    return new CRendererVTB();
+
+  return nullptr;
+}
+
+bool CRendererVTB::Register()
+{
+  VIDEOPLAYER::CRendererFactory::RegisterRenderer("vtbgl", CRendererVTB::Create);
+  return true;
+}
 
 CRendererVTB::CRendererVTB()
 {
@@ -49,47 +57,28 @@ CRendererVTB::~CRendererVTB()
   }
 }
 
-CRenderInfo CRendererVTB::GetRenderInfo()
-{
-  CRenderInfo info;
-  info.formats = m_formats;
-  info.max_buffer_size = NUM_BUFFERS;
-  info.optimal_buffer_size = 5;
-  return info;
-}
-
-void CRendererVTB::AddVideoPictureHW(DVDVideoPicture &picture, int index)
-{
-  YUVBUFFER &buf = m_buffers[index];
-  CVTBData *vtbdata = (CVTBData*)buf.hwDec;
-  if (vtbdata->m_vtbbuf)
-  {
-    CVBufferRelease(vtbdata->m_vtbbuf);
-  }
-  vtbdata->m_vtbbuf = picture.cvBufferRef;
-
-  // retain another reference, this way VideoPlayer and renderer can issue releases.
-  CVBufferRetain(picture.cvBufferRef);
-}
-
 void CRendererVTB::ReleaseBuffer(int idx)
 {
   YUVBUFFER &buf = m_buffers[idx];
-  if (buf.hwDec)
+  if (buf.videoBuffer)
   {
-    CVTBData *vtbdata = (CVTBData*)buf.hwDec;
-    if (vtbdata->m_vtbbuf)
+    VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buf.videoBuffer);
+    if (vb)
     {
-      CVBufferRelease(vtbdata->m_vtbbuf);
-      vtbdata->m_vtbbuf = nullptr;
+      if (vb->m_fence && glIsFenceAPPLE(vb->m_fence))
+      {
+        glDeleteFencesAPPLE(1, &vb->m_fence);
+        vb->m_fence = 0;
+      }
     }
-
-    if (vtbdata->m_fence && glIsFenceAPPLE(vtbdata->m_fence))
-    {
-      glDeleteFencesAPPLE(1, &vtbdata->m_fence);
-      vtbdata->m_fence = 0;
-    }
+    vb->Release();
+    buf.videoBuffer = nullptr;
   }
+}
+
+EShaderFormat CRendererVTB::GetShaderFormat()
+{
+  return SHADER_NV12_RRG;
 }
 
 bool CRendererVTB::LoadShadersHook()
@@ -101,14 +90,14 @@ bool CRendererVTB::LoadShadersHook()
 
 bool CRendererVTB::CreateTexture(int index)
 {
-  YV12Image &im     = m_buffers[index].image;
-  YUVFIELDS &fields = m_buffers[index].fields;
-  YUVPLANES &planes = fields[0];
+  YUVBUFFER &buf = m_buffers[index];
+  YuvImage &im = buf.image;
+  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = buf.fields[0];
 
   DeleteTexture(index);
 
   memset(&im    , 0, sizeof(im));
-  memset(&fields, 0, sizeof(fields));
+  memset(&planes, 0, sizeof(YUVPLANE[YuvImage::MAX_PLANES]));
 
   im.bpp    = 1;
   im.width  = m_sourceWidth;
@@ -130,27 +119,18 @@ bool CRendererVTB::CreateTexture(int index)
     planes[p].pixpertex_y = 1;
   }
 
-  glEnable(m_textureTarget);
   glGenTextures(1, &planes[0].id);
   glGenTextures(1, &planes[1].id);
   planes[2].id = planes[1].id;
-  glDisable(m_textureTarget);
-
-  CVTBData *data = new CVTBData();
-  data->m_fence = 0;
-  data->m_vtbbuf = nullptr;
-  m_buffers[index].hwDec = data;
 
   return true;
 }
 
 void CRendererVTB::DeleteTexture(int index)
 {
-  YUVPLANES  &planes = m_buffers[index].fields[0];
+  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[0];
 
   ReleaseBuffer(index);
-  delete (CVTBData*)m_buffers[index].hwDec;
-  m_buffers[index].hwDec = nullptr;
 
   if (planes[0].id && glIsTexture(planes[0].id))
   {
@@ -168,13 +148,15 @@ void CRendererVTB::DeleteTexture(int index)
 bool CRendererVTB::UploadTexture(int index)
 {
   YUVBUFFER &buf = m_buffers[index];
-  YUVFIELDS &fields = buf.fields;
-  YUVPLANES &planes = fields[0];
-  CVTBData *vtbdata = (CVTBData*)m_buffers[index].hwDec;
+  YUVPLANE (&planes)[YuvImage::MAX_PLANES] = m_buffers[index].fields[0];
 
-  CVImageBufferRef cvBufferRef = vtbdata->m_vtbbuf;
+  VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buf.videoBuffer);
+  if (!vb)
+  {
+    return false;
+  }
 
-  glEnable(m_textureTarget);
+  CVImageBufferRef cvBufferRef = vb->GetPB();
 
   // It is the fastest way to render a CVPixelBuffer backed
   // with an IOSurface as there is no CPU -> GPU upload.
@@ -201,8 +183,8 @@ bool CRendererVTB::UploadTexture(int index)
 
   glBindTexture(m_textureTarget, planes[0].id);
 
-  CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_LUMINANCE,
-                         widthY, heightY, GL_LUMINANCE, GL_UNSIGNED_BYTE, surface, 0);
+  CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RED,
+                         widthY, heightY, GL_RED, GL_UNSIGNED_BYTE, surface, 0);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -210,17 +192,14 @@ bool CRendererVTB::UploadTexture(int index)
 
   glBindTexture(m_textureTarget, planes[1].id);
 
-  CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_LUMINANCE_ALPHA,
-                         widthUV, heightUV, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, surface, 1);
+  CGLTexImageIOSurface2D(cgl_ctx, m_textureTarget, GL_RG,
+                         widthUV, heightUV, GL_RG, GL_UNSIGNED_BYTE, surface, 1);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(m_textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   glBindTexture(m_textureTarget, 0);
-  planes[0].flipindex = buf.flipindex;
-
-  glDisable(m_textureTarget);
 
   CalculateTextureSourceRects(index, 3);
 
@@ -229,27 +208,35 @@ bool CRendererVTB::UploadTexture(int index)
 
 void CRendererVTB::AfterRenderHook(int idx)
 {
-  CVTBData *vtbdata = (CVTBData*)m_buffers[idx].hwDec;
-  if (vtbdata->m_fence && glIsFenceAPPLE(vtbdata->m_fence))
+  YUVBUFFER &buf = m_buffers[idx];
+  VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buf.videoBuffer);
+  if (!vb)
   {
-    glDeleteFencesAPPLE(1, &vtbdata->m_fence);
+    return;
   }
-  glGenFencesAPPLE(1, &vtbdata->m_fence);
-  glSetFenceAPPLE(vtbdata->m_fence);
+
+  if (vb->m_fence && glIsFenceAPPLE(vb->m_fence))
+  {
+    glDeleteFencesAPPLE(1, &vb->m_fence);
+  }
+  glGenFencesAPPLE(1, &vb->m_fence);
+  glSetFenceAPPLE(vb->m_fence);
 }
 
 bool CRendererVTB::NeedBuffer(int idx)
 {
-  CVTBData *vtbdata = (CVTBData*)m_buffers[idx].hwDec;
-  if (!vtbdata)
-    return false;
-
-  if (vtbdata->m_fence && glIsFenceAPPLE(vtbdata->m_fence))
+  YUVBUFFER &buf = m_buffers[idx];
+  VTB::CVideoBufferVTB *vb = dynamic_cast<VTB::CVideoBufferVTB*>(buf.videoBuffer);
+  if (!vb)
   {
-    if (!glTestFenceAPPLE(vtbdata->m_fence))
+    return false;
+  }
+
+  if (vb->m_fence && glIsFenceAPPLE(vb->m_fence))
+  {
+    if (!glTestFenceAPPLE(vb->m_fence))
       return true;
   }
 
   return false;
 }
-#endif

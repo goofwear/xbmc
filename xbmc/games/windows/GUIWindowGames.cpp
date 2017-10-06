@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2012-2016 Team Kodi
+ *      Copyright (C) 2012-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -42,6 +42,7 @@
 
 #include <algorithm>
 
+using namespace KODI;
 using namespace GAME;
 
 #define CONTROL_BTNVIEWASICONS      2
@@ -67,7 +68,7 @@ bool CGUIWindowGames::OnMessage(CGUIMessage& message)
         message.SetStringParam(CMediaSourceSettings::GetInstance().GetDefaultSource("games"));
 
       //! @todo
-      m_dlgProgress = g_windowManager.GetWindow<CGUIDialogProgress>();
+      m_dlgProgress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
 
       break;
     }
@@ -323,7 +324,7 @@ void CGUIWindowGames::OnItemInfo(int itemNumber)
 
   //! @todo
   /*
-  CGUIDialogGameInfo* gameInfo = g_windowManager.GetWindow<CGUIDialogGameInfo>();
+  CGUIDialogGameInfo* gameInfo = g_windowManager.GetWindow<CGUIDialogGameInfo>(WINDOW_DIALOG_PICTURE_INFO);
   if (gameInfo)
   {
     gameInfo->SetGame(item);

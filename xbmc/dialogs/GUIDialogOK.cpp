@@ -28,8 +28,7 @@ CGUIDialogOK::CGUIDialogOK(void)
 {
 }
 
-CGUIDialogOK::~CGUIDialogOK(void)
-{}
+CGUIDialogOK::~CGUIDialogOK(void) = default;
 
 bool CGUIDialogOK::OnMessage(CGUIMessage& message)
 {
@@ -49,7 +48,7 @@ bool CGUIDialogOK::OnMessage(CGUIMessage& message)
 // \brief Show CGUIDialogOK dialog, then wait for user to dismiss it.
 bool CGUIDialogOK::ShowAndGetInput(CVariant heading, CVariant text)
 {
-  CGUIDialogOK *dialog = g_windowManager.GetWindow<CGUIDialogOK>();
+  CGUIDialogOK *dialog = g_windowManager.GetWindow<CGUIDialogOK>(WINDOW_DIALOG_OK);
   if (!dialog)
     return false;
   dialog->SetHeading(heading);
@@ -61,7 +60,7 @@ bool CGUIDialogOK::ShowAndGetInput(CVariant heading, CVariant text)
 // \brief Show CGUIDialogOK dialog, then wait for user to dismiss it.
 bool CGUIDialogOK::ShowAndGetInput(CVariant heading, CVariant line0, CVariant line1, CVariant line2)
 {
-  CGUIDialogOK *dialog = g_windowManager.GetWindow<CGUIDialogOK>();
+  CGUIDialogOK *dialog = g_windowManager.GetWindow<CGUIDialogOK>(WINDOW_DIALOG_OK);
   if (!dialog) 
     return false;
   dialog->SetHeading(heading);
@@ -70,6 +69,22 @@ bool CGUIDialogOK::ShowAndGetInput(CVariant heading, CVariant line0, CVariant li
   dialog->SetLine(2, line2);
   dialog->Open();
   return dialog->IsConfirmed();
+}
+
+bool CGUIDialogOK::ShowAndGetInput(const HELPERS::DialogOKMessage & options)
+{
+  if (!options.heading.isNull())
+    SetHeading(options.heading);
+  if (!options.text.isNull())
+    SetText(options.text);
+
+  for (size_t i = 0; i < 3; ++i)
+  {
+    if (!options.lines[i].isNull())
+      SetLine(i, options.lines[i]);
+  }
+  Open();
+  return IsConfirmed();
 }
 
 void CGUIDialogOK::OnInitWindow()

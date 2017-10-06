@@ -30,22 +30,22 @@
 class CAESinkPULSE : public IAESink
 {
 public:
-  virtual const char *GetName() { return "PULSE"; }
+  const char *GetName() override { return "PULSE"; }
 
   CAESinkPULSE();
-  virtual ~CAESinkPULSE();
+  ~CAESinkPULSE() override;
 
-  virtual bool Initialize(AEAudioFormat &format, std::string &device);
-  virtual void Deinitialize();
+  bool Initialize(AEAudioFormat &format, std::string &device) override;
+  void Deinitialize() override;
 
-  virtual double       GetDelay        () { return 0.0; }
-  virtual void         GetDelay        (AEDelayStatus& status);
-  virtual double       GetCacheTotal   ();
-  virtual unsigned int AddPackets      (uint8_t **data, unsigned int frames, unsigned int offset);
-  virtual void         Drain           ();
+  virtual double GetDelay() { return 0.0; }
+  void GetDelay(AEDelayStatus& status) override;
+  double GetCacheTotal() override;
+  unsigned int AddPackets(uint8_t **data, unsigned int frames, unsigned int offset) override;
+  void Drain() override;
 
-  virtual bool HasVolume() { return true; };
-  virtual void SetVolume(float volume);
+  bool HasVolume() override { return true; };
+  void SetVolume(float volume) override;
 
   static void EnumerateDevicesEx(AEDeviceInfoList &list, bool force = false);
   bool IsInitialized();
@@ -70,8 +70,6 @@ private:
   pa_cvolume m_Volume;
   bool m_volume_needs_update;
   uint32_t m_periodSize;
-  uint64_t m_lastPackageStamp;
-  uint64_t m_filled_bytes;
 
   pa_context *m_Context;
   pa_threaded_mainloop *m_MainLoop;

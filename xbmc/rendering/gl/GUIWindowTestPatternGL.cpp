@@ -30,9 +30,7 @@ CGUIWindowTestPatternGL::CGUIWindowTestPatternGL(void) : CGUIWindowTestPattern()
 {
 }
 
-CGUIWindowTestPatternGL::~CGUIWindowTestPatternGL(void)
-{
-}
+CGUIWindowTestPatternGL::~CGUIWindowTestPatternGL(void) = default;
 
 void CGUIWindowTestPatternGL::DrawVerticalLines(int top, int left, int bottom, int right)
 {
@@ -198,7 +196,7 @@ void CGUIWindowTestPatternGL::BeginRender()
 
 void CGUIWindowTestPatternGL::EndRender()
 {
-  glEnable(GL_TEXTURE_2D);
+
 }
 
 #endif

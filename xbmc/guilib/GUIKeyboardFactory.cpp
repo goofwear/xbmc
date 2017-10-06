@@ -23,9 +23,9 @@
 #include "messaging/ApplicationMessenger.h"
 #include "LocalizeStrings.h"
 #include "GUIKeyboardFactory.h"
-#include "dialogs/GUIDialogOK.h"
 #include "GUIUserMessages.h"
 #include "GUIWindowManager.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "settings/Settings.h"
 #include "utils/md5.h"
 #include "utils/StringUtils.h"
@@ -41,12 +41,9 @@ using namespace KODI::MESSAGING;
 CGUIKeyboard *CGUIKeyboardFactory::g_activeKeyboard = NULL;
 FILTERING CGUIKeyboardFactory::m_filtering = FILTERING_NONE;
 
-CGUIKeyboardFactory::CGUIKeyboardFactory(void)
-{
-}
+CGUIKeyboardFactory::CGUIKeyboardFactory(void) = default;
 
-CGUIKeyboardFactory::~CGUIKeyboardFactory(void)
-{}
+CGUIKeyboardFactory::~CGUIKeyboardFactory(void) = default;
 
 void CGUIKeyboardFactory::keyTypedCB(CGUIKeyboard *ref, const std::string &typedString)
 {
@@ -96,9 +93,9 @@ bool CGUIKeyboardFactory::ShowAndGetInput(std::string& aTextString, CVariant hea
     headingStr = g_localizeStrings.Get((uint32_t)heading.asInteger());
 
 #if defined(TARGET_DARWIN_IOS)
-  kb = g_windowManager.GetWindow<CGUIDialogKeyboardTouch>();
+  kb = g_windowManager.GetWindow<CGUIDialogKeyboardTouch>(WINDOW_DIALOG_KEYBOARD_TOUCH);
 #else
-  kb = g_windowManager.GetWindow<CGUIDialogKeyboardGeneric>();
+  kb = g_windowManager.GetWindow<CGUIDialogKeyboardGeneric>(WINDOW_DIALOG_KEYBOARD);
 #endif
 
   if (kb)
@@ -172,7 +169,7 @@ bool CGUIKeyboardFactory::ShowAndVerifyNewPassword(std::string& newPassword, CVa
     StringUtils::ToLower(newPassword);
     return true;
   }
-  CGUIDialogOK::ShowAndGetInput(CVariant{12341}, CVariant{12344});
+  HELPERS::ShowOKDialogText(CVariant{12341}, CVariant{12344});
   return false;
 }
 

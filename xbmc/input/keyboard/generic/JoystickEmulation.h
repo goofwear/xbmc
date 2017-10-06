@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2015-2016 Team Kodi
+ *      Copyright (C) 2015-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -40,13 +40,13 @@ namespace KEYBOARD
   class CJoystickEmulation : public IKeyboardHandler
   {
   public:
-    CJoystickEmulation(JOYSTICK::IDriverHandler* handler);
+    explicit CJoystickEmulation(JOYSTICK::IDriverHandler* handler);
 
-    virtual ~CJoystickEmulation(void) = default;
+    ~CJoystickEmulation(void) override = default;
 
     // implementation of IKeyboardHandler
-    virtual bool OnKeyPress(const CKey& key) override;
-    virtual void OnKeyRelease(const CKey& key) override;
+    bool OnKeyPress(const CKey& key) override;
+    void OnKeyRelease(const CKey& key) override;
 
   private:
     struct KeyEvent

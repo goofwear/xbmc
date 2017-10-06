@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2015-2016 Team Kodi
+ *      Copyright (C) 2015-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -41,6 +41,24 @@ namespace JOYSTICK
      * \return A capitalized string representation, or "RELEASED" if the hat is centered.
      */
     static const char* HatStateToString(HAT_STATE state);
+
+    /*!
+     * \brief Translate an analog stick direction to a lower-case string
+     *
+     * \param dir The analog stick direction
+     *
+     * \return A lower-case string representation, or "" if the direction is invalid
+     */
+    static const char* TranslateDirection(ANALOG_STICK_DIRECTION dir);
+
+    /*!
+     * \brief Translate an analog stick direction string to an enum value
+     *
+     * \param dir The analog stick direction
+     *
+     * \return The translated direction, or ANALOG_STICK_DIRECTION::UNKNOWN if unknown
+     */
+    static ANALOG_STICK_DIRECTION TranslateDirection(const std::string &dir);
 
     /*!
      * \brief Get the semi-axis direction containing the specified position

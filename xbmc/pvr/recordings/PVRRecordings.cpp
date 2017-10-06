@@ -22,22 +22,23 @@
 
 #include <utility>
 
-#include "ServiceBroker.h"
-#include "epg/EpgContainer.h"
-#include "epg/EpgInfoTag.h"
 #include "FileItem.h"
+#include "ServiceBroker.h"
+#include "URL.h"
 #include "filesystem/Directory.h"
-#include "pvr/addons/PVRClients.h"
-#include "pvr/recordings/PVRRecordingsPath.h"
-#include "pvr/PVRManager.h"
-#include "pvr/PVREvent.h"
 #include "settings/Settings.h"
 #include "threads/SingleLock.h"
-#include "URL.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
+#include "utils/log.h"
 #include "video/VideoDatabase.h"
+
+#include "pvr/PVRManager.h"
+#include "pvr/PVREvent.h"
+#include "pvr/addons/PVRClients.h"
+#include "pvr/epg/EpgContainer.h"
+#include "pvr/epg/EpgInfoTag.h"
+#include "pvr/recordings/PVRRecordingsPath.h"
 
 using namespace PVR;
 
@@ -454,7 +455,7 @@ void CPVRRecordings::UpdateFromClient(const CPVRRecordingPtr &tag)
       const CPVRChannelPtr channel(newTag->Channel());
       if (channel)
       {
-        const EPG::CEpgInfoTagPtr epgTag = EPG::CEpgContainer::GetInstance().GetTagById(channel, newTag->BroadcastUid());
+        const CPVREpgInfoTagPtr epgTag = CServiceBroker::GetPVRManager().EpgContainer().GetTagById(channel, newTag->BroadcastUid());
         if (epgTag)
           epgTag->SetRecording(newTag);
       }
@@ -468,7 +469,7 @@ void CPVRRecordings::UpdateFromClient(const CPVRRecordingPtr &tag)
   }
 }
 
-CPVRRecordingPtr CPVRRecordings::GetRecordingForEpgTag(const EPG::CEpgInfoTagPtr &epgTag) const
+CPVRRecordingPtr CPVRRecordings::GetRecordingForEpgTag(const CPVREpgInfoTagPtr &epgTag) const
 {
   CSingleLock lock(m_critSection);
 
@@ -492,9 +493,9 @@ CPVRRecordingPtr CPVRRecordings::GetRecordingForEpgTag(const EPG::CEpgInfoTagPtr
 
       // note: don't use recording.second->Channel() for comparing channels here as this can lead
       //       to deadlocks. compare client ids and channel ids instead, this has the same effect.
-      if (epgTag->ChannelTag() &&
-          recording.second->ClientID() == epgTag->ChannelTag()->ClientID() &&
-          recording.second->ChannelUid() == epgTag->ChannelTag()->UniqueID() &&
+      if (epgTag->Channel() &&
+          recording.second->ClientID() == epgTag->Channel()->ClientID() &&
+          recording.second->ChannelUid() == epgTag->Channel()->UniqueID() &&
           recording.second->RecordingTimeAsUTC() <= epgTag->StartAsUTC() &&
           recording.second->EndTimeAsUTC() >= epgTag->EndAsUTC())
         return recording.second;
@@ -522,7 +523,7 @@ bool CPVRRecordings::ChangeRecordingsPlayCount(const CFileItemPtr &item, int cou
       items.Add(item);
 
     CLog::Log(LOGDEBUG, "CPVRRecordings - %s - will set watched for %d items", __FUNCTION__, items.Size());
-    for (int i=0;i<items.Size();++i)
+    for (int i = 0; i < items.Size(); ++i)
     {
       CLog::Log(LOGDEBUG, "CPVRRecordings - %s - setting watched for item %d", __FUNCTION__, i);
 
@@ -574,4 +575,22 @@ bool CPVRRecordings::MarkWatched(const CFileItemPtr &item, bool bWatched)
     return IncrementRecordingsPlayCount(item);
   else
     return SetRecordingsPlayCount(item, 0);
+}
+
+bool CPVRRecordings::ResetResumePoint(const CFileItemPtr item)
+{
+  bool bResult = false;
+
+  const CPVRRecordingPtr recording = item->GetPVRRecordingInfoTag();
+  if (recording && m_database.IsOpen())
+  {
+    bResult = true;
+
+    m_database.ClearBookMarksOfFile(item->GetPath(), CBookmark::RESUME);
+    recording->SetResumePoint(CBookmark());
+
+    CServiceBroker::GetPVRManager().PublishEvent(RecordingsInvalidated);
+  }
+
+  return bResult;
 }

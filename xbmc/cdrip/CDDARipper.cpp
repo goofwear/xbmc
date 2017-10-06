@@ -32,7 +32,7 @@
 #include "utils/LabelFormatter.h"
 #include "music/tags/MusicInfoTag.h"
 #include "guilib/GUIWindowManager.h"
-#include "dialogs/GUIDialogOK.h"
+#include "guilib/LocalizeStrings.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingPath.h"
 #include "settings/Settings.h"
@@ -45,12 +45,14 @@
 #include "settings/MediaSourceSettings.h"
 #include "Application.h"
 #include "music/MusicDatabase.h"
-#include "addons/AddonManager.h"
 #include "addons/AudioEncoder.h"
+#include "addons/binary-addons/BinaryAddonBase.h"
+#include "messaging/helpers/DialogOKHelper.h"
 
 using namespace ADDON;
 using namespace XFILE;
 using namespace MUSIC_INFO;
+using namespace KODI::MESSAGING;
 
 CCDDARipper& CCDDARipper::GetInstance()
 {
@@ -63,9 +65,7 @@ CCDDARipper::CCDDARipper()
 {
 }
 
-CCDDARipper::~CCDDARipper()
-{
-}
+CCDDARipper::~CCDDARipper() = default;
 
 // rip a single track from cd
 bool CCDDARipper::RipTrack(CFileItem* pItem)
@@ -152,13 +152,13 @@ bool CCDDARipper::RipCD()
 
 bool CCDDARipper::CreateAlbumDir(const MUSIC_INFO::CMusicInfoTag& infoTag, std::string& strDirectory, int& legalType)
 {
-  CSettingPath *recordingpathSetting = (CSettingPath*)CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_AUDIOCDS_RECORDINGPATH);
+  std::shared_ptr<CSettingPath> recordingpathSetting = std::static_pointer_cast<CSettingPath>(CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_AUDIOCDS_RECORDINGPATH));
   if (recordingpathSetting != NULL)
   {
     strDirectory = recordingpathSetting->GetValue();
     if (strDirectory.empty())
     {
-      if (CGUIControlButtonSetting::GetPath(recordingpathSetting))
+      if (CGUIControlButtonSetting::GetPath(recordingpathSetting, &g_localizeStrings))
         strDirectory = recordingpathSetting->GetValue();
     }
   }
@@ -169,7 +169,7 @@ bool CCDDARipper::CreateAlbumDir(const MUSIC_INFO::CMusicInfoTag& infoTag, std::
     // no rip path has been set, show error
     CLog::Log(LOGERROR, "Error: CDDARipPath has not been set");
     g_graphicsContext.Lock();
-    CGUIDialogOK::ShowAndGetInput(CVariant{257}, CVariant{608});
+    HELPERS::ShowOKDialogText(CVariant{257}, CVariant{608});
     g_graphicsContext.Unlock();
     return false;
   }
@@ -290,13 +290,9 @@ std::string CCDDARipper::GetTrackName(CFileItem *item)
   if (track.empty())
     track = StringUtils::Format("%s%02i", "Track-", trackNumber);
 
-  AddonPtr addon;
-  CAddonMgr::GetInstance().GetAddon(CServiceBroker::GetSettings().GetString(CSettings::SETTING_AUDIOCDS_ENCODER), addon);
-  if (addon)
-  {
-    std::shared_ptr<CAudioEncoder> enc = std::static_pointer_cast<CAudioEncoder>(addon);
-    track += enc->extension;
-  }
+ const BinaryAddonBasePtr addonInfo = CServiceBroker::GetBinaryAddonManager().GetInstalledAddonInfo(CServiceBroker::GetSettings().GetString(CSettings::SETTING_AUDIOCDS_ENCODER), ADDON_AUDIOENCODER);
+  if (addonInfo)
+    track += addonInfo->Type(ADDON_AUDIOENCODER)->GetValue("@extension").asString();
 
   return track;
 }
@@ -307,7 +303,7 @@ void CCDDARipper::OnJobComplete(unsigned int jobID, bool success, CJob* job)
   {
     if(CJobQueue::QueueEmpty())
     {
-      std::string dir = URIUtils::GetDirectory(((CCDDARipJob*)job)->GetOutput());
+      std::string dir = URIUtils::GetDirectory(static_cast<CCDDARipJob*>(job)->GetOutput());
       bool unimportant;
       int source = CUtil::GetMatchingSource(dir, *CMediaSourceSettings::GetInstance().CMediaSourceSettings::GetSources("music"), unimportant);
 

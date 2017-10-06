@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2014-2016 Team Kodi
+ *      Copyright (C) 2014-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -21,8 +21,9 @@
 
 #include "addons/RepositoryUpdater.h"
 #include "guilib/GUIDialog.h"
-#include "utils/Observer.h"
 
+namespace KODI
+{
 namespace GAME
 {
   class IControllerList;
@@ -61,4 +62,5 @@ namespace GAME
     IFeatureList*    m_featureList;
     std::string      m_param; // First auxiliary parameter in call to ActivateWindow()
   };
+}
 }

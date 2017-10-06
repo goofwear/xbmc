@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -22,6 +22,8 @@
 #include <stdint.h>
 #include <string>
 
+namespace KODI
+{
 namespace GAME
 {
   class IGameClientPlayback
@@ -34,16 +36,17 @@ namespace GAME
     virtual bool CanSeek() const = 0;
 
     // Control playback
-    virtual void PauseUnpause() = 0;
     virtual unsigned int GetTimeMs() const = 0;
     virtual unsigned int GetTotalTimeMs() const = 0;
     virtual unsigned int GetCacheTimeMs() const = 0;
     virtual void SeekTimeMs(unsigned int timeMs) = 0;
     virtual double GetSpeed() const = 0;
     virtual void SetSpeed(double speedFactor) = 0;
+    virtual void PauseAsync() = 0; // Pauses after the following frame
 
     // Savestates
-    virtual std::string CreateManualSavestate() = 0; // Returns the path of savestate on success
+    virtual std::string CreateSavestate() = 0; // Returns the path of savestate on success
     virtual bool LoadSavestate(const std::string& path) = 0;
   };
+}
 }

@@ -35,7 +35,7 @@ public:
   static const CContextMenuItem MAIN;
   static const CContextMenuItem MANAGE;
 
-  CContextMenuManager(ADDON::CAddonMgr& addonMgr);
+  explicit CContextMenuManager(ADDON::CAddonMgr& addonMgr);
   ~CContextMenuManager();
   static CContextMenuManager& GetInstance();
 
@@ -47,8 +47,8 @@ public:
   ContextMenuView GetAddonItems(const CFileItem& item, const CContextMenuItem& root = MAIN) const;
 
 private:
-  CContextMenuManager(const CContextMenuManager&);
-  CContextMenuManager const& operator=(CContextMenuManager const&);
+  CContextMenuManager(const CContextMenuManager&) = delete;
+  CContextMenuManager& operator=(CContextMenuManager const&) = delete;
 
   bool IsVisible(
     const CContextMenuItem& menuItem,

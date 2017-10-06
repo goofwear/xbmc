@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2014-2016 Team Kodi
+ *      Copyright (C) 2014-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -39,9 +39,7 @@ CInputHandling::CInputHandling(IInputHandler* handler, IButtonMap* buttonMap)
 {
 }
 
-CInputHandling::~CInputHandling(void)
-{
-}
+CInputHandling::~CInputHandling(void) = default;
 
 bool CInputHandling::OnButtonMotion(unsigned int buttonIndex, bool bPressed)
 {

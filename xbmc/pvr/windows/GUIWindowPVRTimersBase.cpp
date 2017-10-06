@@ -18,10 +18,12 @@
  *
  */
 
+#include "GUIWindowPVRTimersBase.h"
+
 #include "GUIInfoManager.h"
 #include "ServiceBroker.h"
-#include "dialogs/GUIDialogOK.h"
 #include "input/Key.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "settings/Settings.h"
 #include "threads/SingleLock.h"
 #include "utils/URIUtils.h"
@@ -29,12 +31,11 @@
 
 #include "pvr/PVRGUIActions.h"
 #include "pvr/PVRManager.h"
-#include "pvr/timers/PVRTimers.h"
 #include "pvr/addons/PVRClients.h"
-
-#include "GUIWindowPVRTimersBase.h"
+#include "pvr/timers/PVRTimers.h"
 
 using namespace PVR;
+using namespace KODI::MESSAGING;
 
 CGUIWindowPVRTimersBase::CGUIWindowPVRTimersBase(bool bRadio, int id, const std::string &xmlFile) :
   CGUIWindowPVRBase(bRadio, id, xmlFile)
@@ -179,7 +180,7 @@ bool CGUIWindowPVRTimersBase::ActionShowTimer(const CFileItemPtr &item)
 {
   if (!CServiceBroker::GetPVRManager().Clients()->SupportsTimers())
   {
-    CGUIDialogOK::ShowAndGetInput(CVariant{19033}, CVariant{19215}); // "Information", "The PVR backend does not support timers."
+    HELPERS::ShowOKDialogText(CVariant{19033}, CVariant{19215}); // "Information", "The PVR backend does not support timers."
     return false;
   }
 

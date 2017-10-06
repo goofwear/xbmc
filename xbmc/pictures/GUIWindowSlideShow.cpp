@@ -246,7 +246,8 @@ void CGUIWindowSlideShow::OnDeinitWindow(int nextWindowID)
     //g_graphicsContext.SetVideoResolution(CDisplaySettings::GetInstance().GetCurrentResolution(), TRUE);
   }
 
-  if (nextWindowID != WINDOW_FULLSCREEN_VIDEO)
+  if (nextWindowID != WINDOW_FULLSCREEN_VIDEO &&
+      nextWindowID != WINDOW_FULLSCREEN_GAME)
   {
     // wait for any outstanding picture loads
     if (m_pBackgroundLoader)
@@ -386,7 +387,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
 
   // if we haven't processed yet, we should mark the whole screen
   if (!HasProcessed())
-    regions.push_back(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
+    regions.push_back(CDirtyRegion(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight())));
 
   if (m_iCurrentSlide < 0 || m_iCurrentSlide >= static_cast<int>(m_slides.size()))
     m_iCurrentSlide = 0;
@@ -466,7 +467,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
 
   if (m_bErrorMessage)
   { // hack, just mark it all
-    regions.push_back(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
+    regions.push_back(CDirtyRegion(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight())));
     return;
   }
 
@@ -485,8 +486,8 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
       int maxWidth, maxHeight;
 
       GetCheckedSize((float)res.iWidth * m_fZoom,
-                     (float)res.iHeight * m_fZoom,
-                     maxWidth, maxHeight);
+        (float)res.iHeight * m_fZoom,
+        maxWidth, maxHeight);
       m_pBackgroundLoader->LoadPic(m_iCurrentPic, m_iCurrentSlide, picturePath, maxWidth, maxHeight);
       m_iLastFailedNextSlide = -1;
       m_bLoadNextPic = false;
@@ -711,7 +712,7 @@ EVENT_RESULT CGUIWindowSlideShow::OnMouseEvent(const CPoint &point, const CMouse
         OnAction(CAction(ACTION_PREV_PICTURE));
     }
   }
-  else if (event.m_id == ACTION_GESTURE_END)
+  else if (event.m_id == ACTION_GESTURE_END || event.m_id == ACTION_GESTURE_ABORT)
   {
     if (m_fRotate != 0.0f)
     {
@@ -749,7 +750,7 @@ bool CGUIWindowSlideShow::OnAction(const CAction &action)
   {
   case ACTION_SHOW_INFO:
     {
-      CGUIDialogPictureInfo *pictureInfo = g_windowManager.GetWindow<CGUIDialogPictureInfo>();
+      CGUIDialogPictureInfo *pictureInfo = g_windowManager.GetWindow<CGUIDialogPictureInfo>(WINDOW_DIALOG_PICTURE_INFO);
       if (pictureInfo)
       {
         // no need to set the picture here, it's done in Render()
@@ -902,7 +903,7 @@ void CGUIWindowSlideShow::RenderErrorMessage()
      return;
   }
 
-  CGUIFont *pFont = ((CGUILabelControl *)control)->GetLabelInfo().font;
+  CGUIFont *pFont = static_cast<const CGUILabelControl*>(control)->GetLabelInfo().font;
   CGUITextLayout::DrawText(pFont, 0.5f*g_graphicsContext.GetWidth(), 0.5f*g_graphicsContext.GetHeight(), 0xffffffff, 0, g_localizeStrings.Get(747), XBFONT_CENTER_X | XBFONT_CENTER_Y);
 }
 
@@ -1143,6 +1144,7 @@ void CGUIWindowSlideShow::OnLoadPic(int iPic, int iSlideNumber, const std::strin
     // release the texture, and try and reload this pic from scratch
     m_bErrorMessage = true;
   }
+  MarkDirtyRegion();
 }
 
 void CGUIWindowSlideShow::Shuffle()
@@ -1289,7 +1291,7 @@ std::string CGUIWindowSlideShow::GetPicturePath(CFileItem *item)
 
 void CGUIWindowSlideShow::RunSlideShow(std::vector<std::string> paths, int start /* = 0*/)
 {
-  auto dialog = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+  auto dialog = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (dialog)
   {
     std::vector<CFileItemPtr> items;

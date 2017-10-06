@@ -36,7 +36,11 @@
     defined(__powerpc__) || \
     defined(__mips__) || \
     defined(__arm__) || \
-    defined(__aarch64__)
+    defined(__aarch64__) || \
+    defined(__SH4__) || \
+    defined(__sparc__) || \
+    defined(__arc__) || \
+    defined(__xtensa__)
   #define DISABLE_MATHUTILS_ASM_ROUND_INT
 #endif
 
@@ -183,6 +187,20 @@ namespace MathUtils
     MathUtils::round_int(0.0);
     MathUtils::truncate_int(0.0);
     MathUtils::abs(0);
+  }
+
+  /**
+   * Compare two floating-point numbers for equality and regard them
+   * as equal if their difference is below a given threshold.
+   *
+   * It is usually not useful to compare float numbers for equality with
+   * the standard operator== since very close numbers might have different
+   * representations.
+   */
+  template<typename FloatT>
+  inline bool FloatEquals(FloatT f1, FloatT f2, FloatT maxDelta)
+  {
+    return (std::abs(f2 - f1) < maxDelta);
   }
 
 #if 0

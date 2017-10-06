@@ -21,30 +21,39 @@
 #include "GameServices.h"
 #include "controllers/Controller.h"
 #include "controllers/ControllerManager.h"
+#include "games/ports/PortManager.h"
+#include "ServiceBroker.h"
 
+using namespace KODI;
 using namespace GAME;
 
-CGameServices::CGameServices() :
-  m_controllerManager(new CControllerManager)
+CGameServices::CGameServices(CControllerManager &controllerManager,
+                             RETRO:: CGUIGameRenderManager &renderManager,
+                             PERIPHERALS::CPeripherals &peripheralManager) :
+  m_controllerManager(controllerManager),
+  m_gameRenderManager(renderManager),
+  m_portManager(new CPortManager(peripheralManager))
 {
 }
 
-CGameServices::~CGameServices()
-{
-  Deinit();
-}
+CGameServices::~CGameServices() = default;
 
 ControllerPtr CGameServices::GetController(const std::string& controllerId)
 {
-  return m_controllerManager->GetController(controllerId);
+  return m_controllerManager.GetController(controllerId);
 }
 
 ControllerPtr CGameServices::GetDefaultController()
 {
-  return m_controllerManager->GetDefaultController();
+  return m_controllerManager.GetDefaultController();
 }
 
 ControllerVector CGameServices::GetControllers()
 {
-  return m_controllerManager->GetControllers();
+  return m_controllerManager.GetControllers();
+}
+
+CPortManager& CGameServices::PortManager()
+{
+  return *m_portManager;
 }

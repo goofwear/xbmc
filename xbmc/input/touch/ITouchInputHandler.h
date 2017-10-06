@@ -19,6 +19,7 @@
  *
  */
 
+#include <atomic>
 #include <stdint.h>
 
 #include "input/touch/ITouchInputHandling.h"
@@ -50,7 +51,7 @@ public:
   ITouchInputHandler()
     : m_dpi(160.0f)
   { }
-  virtual ~ITouchInputHandler() { }
+  ~ITouchInputHandler() override = default;
 
   /*!
    * \brief Handle a touch event
@@ -101,5 +102,5 @@ protected:
   /*!
    * \brief DPI value of the touch screen
    */
-  float m_dpi;
+  std::atomic<float> m_dpi;
 };

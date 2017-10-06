@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,15 +19,15 @@
  */
 
 #include "GUIDialogButtonCapture.h"
-#include "dialogs/GUIDialogOK.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/WindowIDs.h"
-#include "input/joysticks/DefaultJoystick.h"
-#include "input/joysticks/IActionMap.h"
+#include "input/joysticks/JoystickIDs.h"
 #include "input/joysticks/IButtonMap.h"
 #include "input/joysticks/IButtonMapCallback.h"
 #include "input/joysticks/JoystickUtils.h"
+#include "input/IKeymap.h"
 #include "input/ActionIDs.h"
+#include "messaging/helpers/DialogOKHelper.h" 
 #include "peripherals/Peripherals.h"
 #include "utils/Variant.h"
 #include "ServiceBroker.h"
@@ -37,6 +37,7 @@
 
 using namespace KODI;
 using namespace GAME;
+using namespace KODI::MESSAGING;
 
 CGUIDialogButtonCapture::CGUIDialogButtonCapture() :
   CThread("ButtonCaptureDlg")
@@ -50,15 +51,13 @@ std::string CGUIDialogButtonCapture::ControllerID(void) const
 
 void CGUIDialogButtonCapture::Show()
 {
-  using namespace KODI::MESSAGING;
-
   if (!IsRunning())
   {
     InstallHooks();
 
     Create();
 
-    bool bAccepted = CGUIDialogOK::ShowAndGetInput(CVariant{ GetDialogHeader() }, CVariant{ GetDialogText() });
+    bool bAccepted = HELPERS::ShowOKDialogText(CVariant{ GetDialogHeader() }, CVariant{ GetDialogText() });
 
     StopThread(false);
 
@@ -80,38 +79,40 @@ void CGUIDialogButtonCapture::Process()
       break;
 
     //! @todo Move to rendering thread when there is a rendering thread
-    auto dialog = g_windowManager.GetWindow<CGUIDialogOK>();
-    if (dialog)
-      dialog->SetText(GetDialogText());
+    HELPERS::UpdateOKDialogText(CVariant{ 35013 }, CVariant{ GetDialogText() });
   }
 }
 
 bool CGUIDialogButtonCapture::MapPrimitive(JOYSTICK::IButtonMap* buttonMap,
-                                           JOYSTICK::IActionMap* actionMap,
+                                           IKeymap* keymap,
                                            const JOYSTICK::CDriverPrimitive& primitive)
 {
   if (m_bStop)
     return false;
 
   // First check to see if driver primitive closes the dialog
-  if (actionMap && actionMap->ControllerID() == buttonMap->ControllerID())
+  if (keymap && keymap->ControllerID() == buttonMap->ControllerID())
   {
     std::string feature;
     if (buttonMap->GetFeature(primitive, feature))
     {
-      switch (actionMap->GetActionID(feature))
+      const auto &actions = keymap->GetActions(JOYSTICK::CJoystickUtils::MakeKeyName(feature));
+      if (!actions.empty())
       {
+        switch (actions.begin()->actionId)
+        {
         case ACTION_SELECT_ITEM:
         case ACTION_NAV_BACK:
         case ACTION_PREVIOUS_MENU:
           return false;
         default:
           break;
+        }
       }
     }
   }
 
-  return MapPrimitiveInternal(buttonMap, actionMap, primitive);
+  return MapPrimitiveInternal(buttonMap, keymap, primitive);
 }
 
 void CGUIDialogButtonCapture::InstallHooks(void)

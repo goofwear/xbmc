@@ -21,6 +21,8 @@
 
 #include <memory>
 
+#include "pvr/PVRTypes.h"
+
 class CFileItem;
 typedef std::shared_ptr<CFileItem> CFileItemPtr;
 
@@ -29,9 +31,9 @@ namespace PVR
   class CPVRItem
   {
   public:
-    CPVRItem(const CFileItemPtr &item) : m_item(item) {}
+    explicit CPVRItem(const CFileItemPtr &item) : m_item(item) {}
 
-    EPG::CEpgInfoTagPtr GetEpgInfoTag() const;
+    CPVREpgInfoTagPtr GetEpgInfoTag() const;
     CPVRChannelPtr GetChannel() const;
     CPVRTimerInfoTagPtr GetTimerInfoTag() const;
     CPVRRecordingPtr GetRecording() const;

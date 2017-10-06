@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -38,12 +38,12 @@ namespace MOUSE
   public:
     CMouseInputHandling(IMouseInputHandler* handler, IMouseButtonMap* buttonMap);
 
-    virtual ~CMouseInputHandling(void) = default;
+    ~CMouseInputHandling(void) override = default;
 
     // implementation of IMouseDriverHandler
-    virtual bool OnPosition(int x, int y) override;
-    virtual bool OnButtonPress(unsigned int button) override;
-    virtual void OnButtonRelease(unsigned int button) override;
+    bool OnPosition(int x, int y) override;
+    bool OnButtonPress(unsigned int button) override;
+    void OnButtonRelease(unsigned int button) override;
 
   private:
     // Construction parameters

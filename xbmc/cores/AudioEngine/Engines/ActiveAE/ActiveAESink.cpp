@@ -253,7 +253,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
         {
         case CSinkControlProtocol::CONFIGURE:
           SinkConfig *data;
-          data = (SinkConfig*)msg->data;
+          data = reinterpret_cast<SinkConfig*>(msg->data);
           if (data)
           {
             m_requestedFormat = data->format;
@@ -261,7 +261,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
             m_device = *(data->device);
           }
           m_extError = false;
-          m_extSilenceTimer = 0;
+          m_extSilenceTimer.Set(0);
           m_extStreaming = false;
           ReturnBuffers();
           OpenSink();
@@ -929,6 +929,7 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
 
   if (m_requestedFormat.m_dataFormat == AE_FMT_RAW)
   {
+    bool skipSwap = false;
     if (m_needIecPack)
     {
       if (frames > 0)
@@ -962,7 +963,8 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
       {
         // construct a pause burst if we have already output valid audio
         bool burst = m_extStreaming && (m_packer->GetBuffer()[0] != 0);
-        m_packer->PackPause(m_sinkFormat.m_streamInfo, samples->pkt->pause_burst_ms, burst);
+        if (!m_packer->PackPause(m_sinkFormat.m_streamInfo, samples->pkt->pause_burst_ms, burst))
+          skipSwap = true;
       }
       else
         m_packer->Reset();
@@ -978,7 +980,8 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
         case SKIP_SWAP:
           break;
         case NEED_BYTESWAP:
-          Endian_Swap16_buf((uint16_t *)buffer[0], (uint16_t *)buffer[0], size / 2);
+          if (!skipSwap)
+            Endian_Swap16_buf((uint16_t *)buffer[0], (uint16_t *)buffer[0], size / 2);
           break;
         case CHECK_SWAP:
           SwapInit(samples);

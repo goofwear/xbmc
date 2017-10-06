@@ -19,13 +19,14 @@
  */
 
 #include "IDirectory.h"
-#include "dialogs/GUIDialogOK.h"
 #include "guilib/GUIKeyboardFactory.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "URL.h"
 #include "PasswordManager.h"
 #include "utils/URIUtils.h"
 #include "utils/StringUtils.h"
 
+using namespace KODI::MESSAGING;
 using namespace XFILE;
 
 IDirectory::IDirectory(void)
@@ -33,8 +34,7 @@ IDirectory::IDirectory(void)
   m_flags = DIR_FLAG_DEFAULTS;
 }
 
-IDirectory::~IDirectory(void)
-{}
+IDirectory::~IDirectory(void) = default;
 
 /*!
  \brief Test if file have an allowed extension, as specified with SetMask()
@@ -125,7 +125,7 @@ bool IDirectory::ProcessRequirements()
   if (type == "keyboard")
   {
     std::string input;
-    if (CGUIKeyboardFactory::ShowAndGetInput(input, m_requirements["heading"], false))
+    if (CGUIKeyboardFactory::ShowAndGetInput(input, m_requirements["heading"], false, m_requirements["hidden"].asBoolean()))
     {
       m_requirements["input"] = input;
       return true;
@@ -142,13 +142,13 @@ bool IDirectory::ProcessRequirements()
   }
   else if (type == "error")
   {
-    CGUIDialogOK::ShowAndGetInput(m_requirements["heading"], m_requirements["line1"], m_requirements["line2"], m_requirements["line3"]);
+    HELPERS::ShowOKDialogLines(CVariant{m_requirements["heading"]}, CVariant{m_requirements["line1"]}, CVariant{m_requirements["line2"]}, CVariant{m_requirements["line3"]});
   }
   m_requirements.clear();
   return false;
 }
 
-bool IDirectory::GetKeyboardInput(const CVariant &heading, std::string &input)
+bool IDirectory::GetKeyboardInput(const CVariant &heading, std::string &input, bool hiddenInput)
 {
   if (!m_requirements["input"].asString().empty())
   {
@@ -158,6 +158,7 @@ bool IDirectory::GetKeyboardInput(const CVariant &heading, std::string &input)
   m_requirements.clear();
   m_requirements["type"] = "keyboard";
   m_requirements["heading"] = heading;
+  m_requirements["hidden"] = hiddenInput;
   return false;
 }
 

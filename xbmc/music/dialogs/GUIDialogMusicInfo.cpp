@@ -169,7 +169,7 @@ bool CGUIDialogMusicInfo::OnAction(const CAction &action)
 void CGUIDialogMusicInfo::SetAlbum(const CAlbum& album, const std::string &path)
 {
   m_album = album;
-  SetSongs(m_album.infoSongs);
+  SetSongs(m_album.songs);
   *m_albumItem = CFileItem(path, true);
   m_albumItem->GetMusicInfoTag()->SetAlbum(m_album);
   CMusicDatabase::SetPropertiesFromAlbum(*m_albumItem,m_album);
@@ -504,9 +504,10 @@ void CGUIDialogMusicInfo::OnGetFanart()
   }
 
   std::string result;
-  VECSOURCES sources = *CMediaSourceSettings::GetInstance().GetSources("music");
+  bool flip = false;
+  VECSOURCES sources(*CMediaSourceSettings::GetInstance().GetSources("music"));
+  AddItemPathToFileBrowserSources(sources, *m_albumItem);
   g_mediaManager.GetLocalDrives(sources);
-  bool flip=false;
   if (!CGUIDialogFileBrowser::ShowAndGetImage(items, sources, g_localizeStrings.Get(20437), result, &flip, 20445))
     return;   // user cancelled
 
@@ -591,7 +592,7 @@ void CGUIDialogMusicInfo::AddItemPathToFileBrowserSources(VECSOURCES &sources, c
 
 void CGUIDialogMusicInfo::OnSetUserrating() const
 {
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (dialog)
   {
     // If we refresh and then try to set the rating there will be an items already here...
@@ -616,7 +617,7 @@ void CGUIDialogMusicInfo::OnSetUserrating() const
 
 void CGUIDialogMusicInfo::ShowFor(CFileItem item)
 {
-  auto window = g_windowManager.GetWindow<CGUIWindowMusicNav>();
+  auto window = g_windowManager.GetWindow<CGUIWindowMusicNav>(WINDOW_MUSIC_NAV);
   if (window)
     window->OnItemInfo(&item);
 }

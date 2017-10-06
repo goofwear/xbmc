@@ -23,6 +23,7 @@
 #include <iterator>
 #include <utility>
 
+#include "ServiceBroker.h"
 #include "addons/AddonDatabase.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonManager.h"
@@ -54,45 +55,45 @@ using namespace KODI::MESSAGING;
 
 using KODI::MESSAGING::HELPERS::DialogResponse;
 
-std::unique_ptr<CRepository> CRepository::FromExtension(AddonProps props, const cp_extension_t* ext)
+std::unique_ptr<CRepository> CRepository::FromExtension(CAddonInfo addonInfo, const cp_extension_t* ext)
 {
   DirList dirs;
   AddonVersion version("0.0.0");
   AddonPtr addonver;
-  if (CAddonMgr::GetInstance().GetAddon("xbmc.addon", addonver))
+  if (CServiceBroker::GetAddonMgr().GetAddon("xbmc.addon", addonver))
     version = addonver->Version();
   for (size_t i = 0; i < ext->configuration->num_children; ++i)
   {
     if(ext->configuration->children[i].name &&
        strcmp(ext->configuration->children[i].name, "dir") == 0)
     {
-      AddonVersion min_version(CAddonMgr::GetInstance().GetExtValue(&ext->configuration->children[i], "@minversion"));
+      AddonVersion min_version(CServiceBroker::GetAddonMgr().GetExtValue(&ext->configuration->children[i], "@minversion"));
       if (min_version <= version)
       {
         DirInfo dir;
         dir.version = min_version;
-        dir.checksum = CAddonMgr::GetInstance().GetExtValue(&ext->configuration->children[i], "checksum");
-        dir.info = CAddonMgr::GetInstance().GetExtValue(&ext->configuration->children[i], "info");
-        dir.datadir = CAddonMgr::GetInstance().GetExtValue(&ext->configuration->children[i], "datadir");
-        dir.hashes = CAddonMgr::GetInstance().GetExtValue(&ext->configuration->children[i], "hashes") == "true";
+        dir.checksum = CServiceBroker::GetAddonMgr().GetExtValue(&ext->configuration->children[i], "checksum");
+        dir.info = CServiceBroker::GetAddonMgr().GetExtValue(&ext->configuration->children[i], "info");
+        dir.datadir = CServiceBroker::GetAddonMgr().GetExtValue(&ext->configuration->children[i], "datadir");
+        dir.hashes = CServiceBroker::GetAddonMgr().GetExtValue(&ext->configuration->children[i], "hashes") == "true";
         dirs.push_back(std::move(dir));
       }
     }
   }
-  if (!CAddonMgr::GetInstance().GetExtValue(ext->configuration, "info").empty())
+  if (!CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "info").empty())
   {
     DirInfo info;
-    info.checksum = CAddonMgr::GetInstance().GetExtValue(ext->configuration, "checksum");
-    info.info = CAddonMgr::GetInstance().GetExtValue(ext->configuration, "info");
-    info.datadir = CAddonMgr::GetInstance().GetExtValue(ext->configuration, "datadir");
-    info.hashes = CAddonMgr::GetInstance().GetExtValue(ext->configuration, "hashes") == "true";
+    info.checksum = CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "checksum");
+    info.info = CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "info");
+    info.datadir = CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "datadir");
+    info.hashes = CServiceBroker::GetAddonMgr().GetExtValue(ext->configuration, "hashes") == "true";
     dirs.push_back(std::move(info));
   }
-  return std::unique_ptr<CRepository>(new CRepository(std::move(props), std::move(dirs)));
+  return std::unique_ptr<CRepository>(new CRepository(std::move(addonInfo), std::move(dirs)));
 }
 
-CRepository::CRepository(AddonProps props, DirList dirs)
-    : CAddon(std::move(props)), m_dirs(std::move(dirs))
+CRepository::CRepository(CAddonInfo addonInfo, DirList dirs)
+    : CAddon(std::move(addonInfo)), m_dirs(std::move(dirs))
 {
 }
 
@@ -156,7 +157,7 @@ bool CRepository::FetchIndex(const DirInfo& repo, VECADDONS& addons) noexcept
   }
 
   if (URIUtils::HasExtension(repo.info, ".gz")
-      || CMime::GetFileTypeFromMime(http.GetMimeType()) == CMime::EFileType::FileTypeGZip)
+      || CMime::GetFileTypeFromMime(http.GetProperty(XFILE::FILE_PROPERTY_MIME_TYPE)) == CMime::EFileType::FileTypeGZip)
   {
     CLog::Log(LOGDEBUG, "CRepository '%s' is gzip. decompressing", repo.info.c_str());
     std::string buffer;
@@ -168,7 +169,7 @@ bool CRepository::FetchIndex(const DirInfo& repo, VECADDONS& addons) noexcept
     response = std::move(buffer);
   }
 
-  return CAddonMgr::GetInstance().AddonsFromRepoXML(repo, response, addons);
+  return CServiceBroker::GetAddonMgr().AddonsFromRepoXML(repo, response, addons);
 }
 
 CRepository::FetchStatus CRepository::FetchIfChanged(const std::string& oldChecksum,
@@ -243,14 +244,17 @@ bool CRepositoryUpdateJob::DoWork()
       AddonPtr oldAddon;
       if (database.GetAddon(addon->ID(), oldAddon) && addon->Version() > oldAddon->Version())
       {
-        if (!oldAddon->Icon().empty() || !oldAddon->FanArt().empty() || !oldAddon->Screenshots().empty())
+        if (!oldAddon->Icon().empty() || !oldAddon->Art().empty() || !oldAddon->Screenshots().empty())
           CLog::Log(LOGDEBUG, "CRepository: invalidating cached art for '%s'", addon->ID().c_str());
+
         if (!oldAddon->Icon().empty())
           textureDB.InvalidateCachedTexture(oldAddon->Icon());
-        if (!oldAddon->FanArt().empty())
-          textureDB.InvalidateCachedTexture(oldAddon->Icon());
+
         for (const auto& path : oldAddon->Screenshots())
           textureDB.InvalidateCachedTexture(path);
+
+        for (const auto& art : oldAddon->Art())
+          textureDB.InvalidateCachedTexture(art.second);
       }
     }
     textureDB.CommitMultipleExecute();

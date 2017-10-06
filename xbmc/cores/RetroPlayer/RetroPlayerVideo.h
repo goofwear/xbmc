@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2012-2016 Team Kodi
+ *      Copyright (C) 2012-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,54 +20,33 @@
 #pragma once
 
 #include "games/addons/GameClientCallbacks.h"
-//#include "threads/Thread.h"
 
-#include <memory>
-
-class CDVDClock;
-class CDVDVideoCodec;
 class CPixelConverter;
-class CProcessInfo;
-class CRenderManager;
-struct DVDVideoPicture;
 
-namespace GAME
+namespace KODI
 {
-  class CRetroPlayerVideo : public IGameVideoCallback
-                            //protected CThread
+namespace RETRO
+{
+  class CRPProcessInfo;
+  class CRPRenderManager;
+
+  class CRetroPlayerVideo : public GAME::IGameVideoCallback
   {
   public:
-    CRetroPlayerVideo(CRenderManager& m_renderManager, CProcessInfo& m_processInfo);
+    CRetroPlayerVideo(CRPRenderManager& m_renderManager, CRPProcessInfo& m_processInfo);
 
-    virtual ~CRetroPlayerVideo();
+    ~CRetroPlayerVideo() override;
 
     // implementation of IGameVideoCallback
-    virtual bool OpenPixelStream(AVPixelFormat pixfmt, unsigned int width, unsigned int height, double framerate, unsigned int orientationDeg) override;
-    virtual bool OpenEncodedStream(AVCodecID codec) override;
-    virtual void AddData(const uint8_t* data, unsigned int size) override;
-    virtual void CloseStream() override;
-
-    /*
-  protected:
-    // implementation of CThread
-    virtual void Process(void);
-    */
+    bool OpenPixelStream(AVPixelFormat pixfmt, unsigned int width, unsigned int height, unsigned int orientationDeg) override;
+    bool OpenEncodedStream(AVCodecID codec) override;
+    void AddData(const uint8_t* data, unsigned int size) override;
+    void CloseStream() override;
 
   private:
-    bool Configure(DVDVideoPicture& picture);
-    bool GetPicture(const uint8_t* data, unsigned int size, DVDVideoPicture& picture);
-    void SendPicture(DVDVideoPicture& picture);
-
     // Construction parameters
-    CRenderManager& m_renderManager;
-    CProcessInfo&   m_processInfo;
-
-    // Stream properties
-    double       m_framerate;
-    unsigned int m_orientation; // Degrees counter-clockwise
-    bool         m_bConfigured; // Need first picture to configure the render manager
-    unsigned int m_droppedFrames;
-    std::unique_ptr<CPixelConverter> m_pixelConverter;
-    std::unique_ptr<CDVDVideoCodec>  m_pVideoCodec;
+    CRPRenderManager& m_renderManager;
+    CRPProcessInfo&   m_processInfo;
   };
+}
 }

@@ -118,10 +118,10 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     static CAdvancedSettings* getInstance();
 
-    virtual void OnSettingsLoaded() override;
-    virtual void OnSettingsUnloaded() override;
+    void OnSettingsLoaded() override;
+    void OnSettingsUnloaded() override;
 
-    virtual void OnSettingChanged(const CSetting *setting) override;
+    void OnSettingChanged(std::shared_ptr<const CSetting> setting) override;
 
     void Initialize();
     bool Initialized() { return m_initialized; };
@@ -134,7 +134,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     static void GetCustomExtensions(TiXmlElement *pRootElement, std::string& extensions);
 
     bool CanLogComponent(int component) const;
-    static void SettingOptionsLoggingComponentsFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
+    static void SettingOptionsLoggingComponentsFiller(std::shared_ptr<const CSetting> setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
 
     int m_audioHeadRoom;
     float m_ac3Gain;
@@ -190,7 +190,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_DXVAForceProcessorRenderer;
     bool m_DXVAAllowHqScaling;
     int  m_videoFpsDetect;
-    int  m_videoBusyDialogDelay_ms;
     bool m_mediacodecForceSoftwareRendering;
 
     std::string m_videoDefaultPlayer;
@@ -257,12 +256,14 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     bool m_bMusicLibraryAllItemsOnBottom;
     bool m_bMusicLibraryCleanOnUpdate;
     bool m_bMusicLibraryPromptFullTagScan;
+    bool m_bMusicLibraryArtistSortOnUpdate;
     std::string m_strMusicLibraryAlbumFormat;
     bool m_prioritiseAPEv2tags;
     std::string m_musicItemSeparator;
     std::vector<std::string> m_musicArtistSeparators;
     std::string m_videoItemSeparator;
     std::vector<std::string> m_musicTagsFromFileFilters;
+    bool m_musicUseArtistSortName;
 
     bool m_bVideoLibraryAllItemsOnBottom;
     int m_iVideoLibraryRecentlyAddedItems;
@@ -277,7 +278,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     std::set<std::string> m_vecTokens;
 
-    int m_iEpgLingerTime;           // minutes
     int m_iEpgUpdateCheckInterval;  // seconds
     int m_iEpgCleanupInterval;      // seconds
     int m_iEpgActiveTagCheckInterval; // seconds
@@ -341,6 +341,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
 
     bool m_guiVisualizeDirtyRegions;
     int  m_guiAlgorithmDirtyRegions;
+    bool m_guiSmartRedraw;
     unsigned int m_addonPackageFolderSize;
 
     unsigned int m_cacheMemSize;
@@ -354,14 +355,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     std::vector<std::string> m_settingsFiles;
     void ParseSettingsFile(const std::string &file);
 
-    float GetDisplayLatency(float refreshrate);
+    float GetLatencyTweak(float refreshrate);
     bool m_initialized;
-
-    //! \brief Returns a list of picture extension for filtering in the GUI
-    std::string GetPictureExtensions() const;
-
-    //! \brief Returns a list of music extension for filtering in the GUI
-    std::string GetMusicExtensions() const;
 
     void SetDebugMode(bool debug);
 
@@ -372,6 +367,8 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     std::string m_videoExtensions;
     std::string m_discStubExtensions;
     std::string m_subtitlesExtensions;
+    std::string m_musicExtensions;
+    std::string m_pictureExtensions;
 
     std::string m_stereoscopicregex_3d;
     std::string m_stereoscopicregex_sbs;
@@ -387,8 +384,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     std::string m_userAgent;
 
   private:
-    std::string m_musicExtensions;
-    std::string m_pictureExtensions;
     void setExtraLogLevel(const std::vector<CVariant> &components);
 };
 

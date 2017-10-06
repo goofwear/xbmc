@@ -35,10 +35,6 @@
 
 bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item)
 {
-  /* if asked to resume somewhere, we should not show anything */
-  if (item.m_lStartOffset || (item.HasVideoInfoTag() && item.GetVideoInfoTag()->m_iBookmarkId > 0))
-    return true;
-
   if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_DISC_PLAYBACK) != BD_PLAYBACK_SIMPLE_MENU)
     return true;
 
@@ -96,7 +92,7 @@ bool CGUIDialogSimpleMenu::ShowPlaySelection(CFileItem& item, const std::string&
     return true;
   }
 
-  CGUIDialogSelect* dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect* dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   while (true)
   {
     dialog->Reset();

@@ -22,7 +22,7 @@
 
 #include <utility>
 
-#include "dialogs/GUIDialogOK.h"
+#include "guilib/WindowIDs.h"
 #include "GUIUserMessages.h"
 #include "LangInfo.h"
 #include "utils/StringUtils.h"
@@ -63,8 +63,7 @@ CGUIWindowWeather::CGUIWindowWeather(void)
   m_loadType = KEEP_IN_MEMORY;
 }
 
-CGUIWindowWeather::~CGUIWindowWeather(void)
-{}
+CGUIWindowWeather::~CGUIWindowWeather(void) = default;
 
 bool CGUIWindowWeather::OnMessage(CGUIMessage& message)
 {

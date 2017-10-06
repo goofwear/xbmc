@@ -33,6 +33,7 @@
 #include "filesystem/SpecialProtocol.h"
 #include "guilib/GraphicContext.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
 #include "interfaces/legacy/Addon.h"
 #include "interfaces/python/LanguageHook.h"
 #include "interfaces/python/PyContext.h"
@@ -211,7 +212,7 @@ bool CPythonInvoker::execute(const std::string &script, const std::vector<std::s
         "modules installed to python path as fallback. This behaviour will be removed in future "
         "version.", GetId());
     ADDON::VECADDONS addons;
-    ADDON::CAddonMgr::GetInstance().GetAddons(addons, ADDON::ADDON_SCRIPT_MODULE);
+    CServiceBroker::GetAddonMgr().GetAddons(addons, ADDON::ADDON_SCRIPT_MODULE);
     for (unsigned int i = 0; i < addons.size(); ++i)
       addPath(CSpecialProtocol::TranslatePath(addons[i]->LibPath()));
   }
@@ -595,7 +596,7 @@ void CPythonInvoker::onError(const std::string &exceptionType /* = "" */, const 
   CPyThreadState releaseGil;
   CSingleLock gc(g_graphicsContext);
 
-  CGUIDialogKaiToast *pDlgToast = g_windowManager.GetWindow<CGUIDialogKaiToast>();
+  CGUIDialogKaiToast *pDlgToast = g_windowManager.GetWindow<CGUIDialogKaiToast>(WINDOW_DIALOG_KAI_TOAST);
   if (pDlgToast != NULL)
   {
     std::string message;
@@ -639,7 +640,7 @@ void CPythonInvoker::getAddonModuleDeps(const ADDON::AddonPtr& addon, std::set<s
   {
     //Check if dependency is a module addon
     ADDON::AddonPtr dependency;
-    if (ADDON::CAddonMgr::GetInstance().GetAddon(it->first, dependency, ADDON::ADDON_SCRIPT_MODULE))
+    if (CServiceBroker::GetAddonMgr().GetAddon(it->first, dependency, ADDON::ADDON_SCRIPT_MODULE))
     {
       std::string path = CSpecialProtocol::TranslatePath(dependency->LibPath());
       if (paths.find(path) == paths.end())

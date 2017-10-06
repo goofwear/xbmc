@@ -46,9 +46,9 @@
 #include "settings/Settings.h"
 #include "guilib/TextureManager.h"
 #include "Util.h"
-#include "ServiceBroker.h"
 #include "cores/AudioEngine/Interfaces/AE.h"
 #include "storage/MediaManager.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/LangCodeExpander.h"
 #include "utils/StringUtils.h"
 #include "utils/SystemInfo.h"
@@ -209,12 +209,12 @@ namespace XBMCAddon
       case CLangCodeExpander::ISO_639_2:
         {
           std::string langCode;
-          g_LangCodeExpander.ConvertToISO6392T(lang, langCode);
+          g_LangCodeExpander.ConvertToISO6392B(lang, langCode);
           if (region)
           {
             std::string region = g_langInfo.GetRegionLocale();
             std::string region3Code;
-            g_LangCodeExpander.ConvertToISO6392T(region, region3Code);
+            g_LangCodeExpander.ConvertToISO6392B(region, region3Code);
             region3Code = "-" + region3Code;
             return (langCode += region3Code);
           }
@@ -350,7 +350,7 @@ namespace XBMCAddon
 
       bool ret;
       {
-        LOCKGUI;
+        XBMCAddonUtils::GuiLock lock(nullptr, false);
 
         int id = g_windowManager.GetTopMostModalDialogID();
         if (id == WINDOW_INVALID) id = g_windowManager.GetActiveWindow();
@@ -458,11 +458,11 @@ namespace XBMCAddon
       XBMC_TRACE;
       String result;
       if (strcmpi(mediaType, "video") == 0)
-        result = g_advancedSettings.m_videoExtensions;
+        result = CServiceBroker::GetFileExtensionProvider().GetVideoExtensions();
       else if (strcmpi(mediaType, "music") == 0)
-        result = g_advancedSettings.GetMusicExtensions();
+        result = CServiceBroker::GetFileExtensionProvider().GetMusicExtensions();
       else if (strcmpi(mediaType, "picture") == 0)
-        result = g_advancedSettings.GetPictureExtensions();
+        result = CServiceBroker::GetFileExtensionProvider().GetPictureExtensions();
 
       //! @todo implement
       //    else
@@ -506,7 +506,7 @@ namespace XBMCAddon
           // maybe it's a check whether the language exists or not
           if (convertedLanguage.empty())
           {
-            g_LangCodeExpander.ConvertToISO6392T(language, convertedLanguage);
+            g_LangCodeExpander.ConvertToISO6392B(language, convertedLanguage);
             g_LangCodeExpander.Lookup(convertedLanguage, convertedLanguage);
           }
           break;
@@ -515,7 +515,7 @@ namespace XBMCAddon
         g_LangCodeExpander.ConvertToISO6391(language, convertedLanguage);
         break;
       case CLangCodeExpander::ISO_639_2:
-        g_LangCodeExpander.ConvertToISO6392T(language, convertedLanguage);
+        g_LangCodeExpander.ConvertToISO6392B(language, convertedLanguage);
         break;
       default:
         return "";

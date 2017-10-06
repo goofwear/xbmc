@@ -19,6 +19,7 @@
  */
 
 #include "DVDClock.h"
+#include "TimingConstants.h"
 #include "VideoReferenceClock.h"
 #include <math.h>
 #include "utils/MathUtils.h"
@@ -35,6 +36,7 @@ CDVDClock::CDVDClock()
   m_pauseClock = 0;
   m_bReset = true;
   m_paused = false;
+  m_speedAfterPause = DVD_PLAYSPEED_PAUSE;
   m_iDisc = 0;
   m_maxspeedadjust = 0.0;
   m_systemAdjust = 0;
@@ -50,9 +52,7 @@ CDVDClock::CDVDClock()
   m_systemUsed = m_systemFrequency;
 }
 
-CDVDClock::~CDVDClock()
-{
-}
+CDVDClock::~CDVDClock() = default;
 
 // Returns the current absolute clock in units of DVD_TIME_BASE (usually microseconds).
 double CDVDClock::GetAbsoluteClock(bool interpolated /*= true*/)
@@ -119,6 +119,16 @@ void CDVDClock::Pause(bool pause)
   {
     m_paused = false;
     SetSpeed(m_speedAfterPause);
+  }
+}
+
+void CDVDClock::Advance(double time)
+{
+  CSingleLock lock(m_critSection);
+
+  if (m_pauseClock)
+  {
+    m_pauseClock += time / DVD_TIME_BASE * m_systemFrequency;
   }
 }
 

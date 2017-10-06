@@ -24,7 +24,6 @@
 
 #include "ServiceBroker.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
-#include "dialogs/GUIDialogOK.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "events/EventLog.h"
 #include "events/MediaLibraryEvent.h"
@@ -40,6 +39,7 @@
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/ApplicationMessenger.h"
 #include "messaging/helpers/DialogHelper.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "NfoFile.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
@@ -47,6 +47,7 @@
 #include "threads/SystemClock.h"
 #include "URL.h"
 #include "Util.h"
+#include "utils/FileExtensionProvider.h"
 #include "utils/log.h"
 #include "utils/md5.h"
 #include "utils/RegExp.h"
@@ -80,8 +81,7 @@ namespace VIDEO
   }
 
   CVideoInfoScanner::~CVideoInfoScanner()
-  {
-  }
+  = default;
 
   void CVideoInfoScanner::Process()
   {
@@ -92,7 +92,7 @@ namespace VIDEO
       if (m_showDialog && !CServiceBroker::GetSettings().GetBool(CSettings::SETTING_VIDEOLIBRARY_BACKGROUNDUPDATE))
       {
         CGUIDialogExtendedProgressBar* dialog =
-          g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>();
+          g_windowManager.GetWindow<CGUIDialogExtendedProgressBar>(WINDOW_DIALOG_EXT_PROGRESS);
         if (dialog)
            m_handle = dialog->GetHandle(g_localizeStrings.Get(314));
       }
@@ -296,7 +296,7 @@ namespace VIDEO
       }
       else
       { // need to fetch the folder
-        CDirectory::GetDirectory(strDirectory, items, g_advancedSettings.m_videoExtensions);
+        CDirectory::GetDirectory(strDirectory, items, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions());
         items.Stack();
 
         // check whether to re-use previously computed fast hash
@@ -334,7 +334,7 @@ namespace VIDEO
 
       if (foundDirectly && !settings.parent_name_root)
       {
-        CDirectory::GetDirectory(strDirectory, items, g_advancedSettings.m_videoExtensions);
+        CDirectory::GetDirectory(strDirectory, items, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions());
         items.SetPath(strDirectory);
         GetPathHash(items, hash);
         bSkip = true;
@@ -430,8 +430,8 @@ namespace VIDEO
         continue;
 
       // Discard all exclude files defined by regExExclude
-      if (CUtil::ExcludeFileOrFolder(pItem->GetPath(), (content == CONTENT_TVSHOWS) ? g_advancedSettings.m_tvshowExcludeFromScanRegExps
-                                                                                    : g_advancedSettings.m_moviesExcludeFromScanRegExps))
+      if (IsExcluded(pItem->GetPath(), (content == CONTENT_TVSHOWS) ? g_advancedSettings.m_tvshowExcludeFromScanRegExps
+                                                                    : g_advancedSettings.m_moviesExcludeFromScanRegExps))
         continue;
 
       if (info2->Content() == CONTENT_MOVIES || info2->Content() == CONTENT_MUSICVIDEOS)
@@ -780,7 +780,7 @@ namespace VIDEO
         if (!hash.empty())
           flags |= DIR_FLAG_NO_FILE_INFO;
 
-        CUtil::GetRecursiveListing(item->GetPath(), items, g_advancedSettings.m_videoExtensions, flags);
+        CUtil::GetRecursiveListing(item->GetPath(), items, CServiceBroker::GetFileExtensionProvider().GetVideoExtensions(), flags);
 
         // fast hash failed - compute slow one
         if (hash.empty())
@@ -882,7 +882,7 @@ namespace VIDEO
         continue;
 
       // Discard all exclude files defined by regExExcludes
-      if (CUtil::ExcludeFileOrFolder(items[i]->GetPath(), regexps))
+      if (IsExcluded(items[i]->GetPath(), regexps))
         continue;
 
       /*
@@ -1294,6 +1294,7 @@ namespace VIDEO
 
     CFileItemPtr itemCopy = CFileItemPtr(new CFileItem(*pItem));
     CVariant data;
+    data["added"] = true;
     if (m_bRunning)
       data["transaction"] = true;
     ANNOUNCEMENT::CAnnouncementManager::GetInstance().Announce(ANNOUNCEMENT::VideoLibrary, "xbmc", "OnUpdate", itemCopy, data);
@@ -2078,7 +2079,7 @@ namespace VIDEO
 
     if (pDialog)
     {
-      CGUIDialogOK::ShowAndGetInput(CVariant{20448}, CVariant{20449});
+      HELPERS::ShowOKDialogText(CVariant{20448}, CVariant{20449});
       return false;
     }
     return HELPERS::ShowYesNoDialogText(CVariant{20448}, CVariant{20450}) == DialogResponse::YES;

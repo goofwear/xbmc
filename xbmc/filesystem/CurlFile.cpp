@@ -427,6 +427,7 @@ CCurlFile::CCurlFile()
   m_seekable = true;
   m_useOldHttpVersion = false;
   m_connecttimeout = 0;
+  m_redirectlimit = 5;
   m_lowspeedtime = 0;
   m_ftpauth = "";
   m_ftpport = "";
@@ -503,9 +504,9 @@ void CCurlFile::SetCommonOptions(CReadState* state)
 
   g_curlInterface.easy_setopt(h, CURLOPT_FTP_USE_EPSV, 0); // turn off epsv
 
-  // Allow us to follow two redirects
-  g_curlInterface.easy_setopt(h, CURLOPT_FOLLOWLOCATION, TRUE);
-  g_curlInterface.easy_setopt(h, CURLOPT_MAXREDIRS, 5);
+  // Allow us to follow redirects
+  g_curlInterface.easy_setopt(h, CURLOPT_FOLLOWLOCATION, m_redirectlimit != 0);
+  g_curlInterface.easy_setopt(h, CURLOPT_MAXREDIRS, m_redirectlimit);
 
   // Enable cookie engine for current handle
   g_curlInterface.easy_setopt(h, CURLOPT_COOKIEFILE, "");
@@ -821,6 +822,8 @@ void CCurlFile::ParseAndCorrectUrl(CURL &url2)
           m_cipherlist = value;
         else if (name == "connection-timeout")
           m_connecttimeout = strtol(value.c_str(), NULL, 10);
+        else if (name == "redirect-limit")
+          m_redirectlimit = strtol(value.c_str(), NULL, 10);
         else if (name == "postdata")
         {
           m_postdata = Base64::Decode(value);
@@ -830,39 +833,30 @@ void CCurlFile::ParseAndCorrectUrl(CURL &url2)
         {
           SetRequestHeader(it->first, value);
         }
-        // other standard headers (see https://en.wikipedia.org/wiki/List_of_HTTP_header_fields)
-        else if (name == "accept" || name == "accept-language" || name == "accept-datetime" ||
-                 name == "authorization" || name == "cache-control" || name == "connection" ||
-                 name == "content-md5" || name == "content-type" || name == "date" ||
-                 name == "expect" || name == "forwarded" || name == "from" ||
-                 name == "if-match" || name == "if-modified-since" || name == "if-none-match" ||
-                 name == "if-range" || name == "if-unmodified-since" || name == "max-forwards" ||
-                 name == "origin" || name == "pragma" || name == "range" || name == "te" ||
-                 name == "upgrade" || name == "via" || name == "warning" ||
-                 name == "x-requested-with" || name == "dnt" || name == "x-forwarded-for" ||
-                 name == "x-forwarded-host" || name == "x-forwarded-proto" ||
-                 name == "front-end-https" || name == "x-http-method-override" ||
-                 name == "x-att-deviceid" || name == "x-wap-profile" || name == "x-uidh" ||
-                 name == "x-csrf-token" || name == "x-request-id" || name == "x-correlation-id" ||
-                 name == "icy-metadata")
+        else if (name == "customrequest")
         {
-          SetRequestHeader(it->first, value);
-          if (name == "authorization")
-            CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() adding custom header option '%s: ***********'", it->first.c_str());
-          else
-            CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() adding custom header option '%s: %s'", it->first.c_str(), value.c_str());
+          SetCustomRequest(value);
         }
-        // we don't add blindly all options to headers anymore
-        // if anybody wants to pass options to ffmpeg, explicitly prefix those
-        // to be identified here
         else
         {
-          CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() ignoring header option '%s: %s'", it->first.c_str(), value.c_str());
+          if (name.length() > 0 && name[0] == '!')
+          {
+            SetRequestHeader(it->first.substr(1), value);
+            CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() adding custom header option '%s: ***********'", it->first.substr(1).c_str());
+          }
+          else
+          {
+            SetRequestHeader(it->first, value);
+            if (name == "authorization")
+              CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() adding custom header option '%s: ***********'", it->first.c_str());
+            else
+              CLog::Log(LOGDEBUG, "CurlFile::ParseAndCorrectUrl() adding custom header option '%s: %s'", it->first.c_str(), value.c_str());
+          }
         }
       }
     }
   }
-  
+
   // Unset the protocol options to have an url without protocol options
   url2.SetProtocolOptions("");
 
@@ -1264,7 +1258,7 @@ bool CCurlFile::Exists(const CURL& url)
 int64_t CCurlFile::Seek(int64_t iFilePosition, int iWhence)
 {
   int64_t nextPos = m_state->m_filePos;
-  
+
   if(!m_seekable)
     return -1;
 
@@ -1314,7 +1308,7 @@ int64_t CCurlFile::Seek(int64_t iFilePosition, int iWhence)
 
       if (m_state->Seek(nextPos))
         return nextPos;
-      
+
       m_state->Disconnect();
     }
   }
@@ -1779,14 +1773,6 @@ void CCurlFile::SetRequestHeader(const std::string& header, long value)
   m_requestheaders[header] = StringUtils::Format("%ld", value);
 }
 
-std::string CCurlFile::GetServerReportedCharset(void)
-{
-  if (!m_state)
-    return "";
-
-  return m_state->m_httpheader.GetCharset();
-}
-
 std::string CCurlFile::GetURL(void)
 {
   return m_url;
@@ -1825,7 +1811,7 @@ bool CCurlFile::GetMimeType(const CURL &url, std::string &content, const std::st
     if (buffer.st_mode == _S_IFDIR)
       content = "x-directory/normal";
     else
-      content = file.GetMimeType();
+      content = file.GetProperty(XFILE::FILE_PROPERTY_MIME_TYPE);
     CLog::Log(LOGDEBUG, "CCurlFile::GetMimeType - %s -> %s", redactUrl.c_str(), content.c_str());
     return true;
   }
@@ -1847,7 +1833,7 @@ bool CCurlFile::GetContentType(const CURL &url, std::string &content, const std:
     if (buffer.st_mode == _S_IFDIR)
       content = "x-directory/normal";
     else
-      content = file.GetContent();
+      content = file.GetProperty(XFILE::FILE_PROPERTY_CONTENT_TYPE, "");
     CLog::Log(LOGDEBUG, "CCurlFile::GetContentType - %s -> %s", redactUrl.c_str(), content.c_str());
     return true;
   }
@@ -1929,6 +1915,40 @@ int CCurlFile::IoControl(EIoControl request, void* param)
   }
 
   return -1;
+}
+
+const std::string CCurlFile::GetProperty(XFILE::FileProperty type, const std::string &name) const
+{
+  switch (type)
+  {
+  case FILE_PROPERTY_RESPONSE_PROTOCOL:
+    return m_state->m_httpheader.GetProtoLine();
+  case FILE_PROPERTY_RESPONSE_HEADER:
+    return m_state->m_httpheader.GetValue(name);
+  case FILE_PROPERTY_CONTENT_TYPE:
+    return m_state->m_httpheader.GetValue("content-type");
+  case FILE_PROPERTY_CONTENT_CHARSET:
+    return m_state->m_httpheader.GetCharset();
+  case FILE_PROPERTY_MIME_TYPE:
+    return m_state->m_httpheader.GetMimeType();
+  default:
+    return "";
+  }
+}
+
+const std::vector<std::string> CCurlFile::GetPropertyValues(XFILE::FileProperty type, const std::string &name) const
+{
+  if (type == FILE_PROPERTY_RESPONSE_HEADER)
+  {
+    return m_state->m_httpheader.GetValues(name);
+  }
+  std::vector<std::string> values;
+  std::string value = GetProperty(type, name);
+  if (!value.empty())
+  {
+    values.emplace_back(value);
+  }
+  return values;
 }
 
 double CCurlFile::GetDownloadSpeed()

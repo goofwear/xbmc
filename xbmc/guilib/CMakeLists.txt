@@ -1,5 +1,4 @@
 set(SOURCES DDSImage.cpp
-            DirectXGraphics.cpp
             DirtyRegionSolvers.cpp
             DirtyRegionTracker.cpp
             FFmpegImage.cpp
@@ -14,6 +13,7 @@ set(SOURCES DDSImage.cpp
             GUIControlFactory.cpp
             GUIControlGroup.cpp
             GUIControlGroupList.cpp
+            GUIControlLookup.cpp
             GUIControlProfiler.cpp
             GUIDialog.cpp
             GUIEditControl.cpp
@@ -62,7 +62,6 @@ set(SOURCES DDSImage.cpp
             IWindowManagerCallback.cpp
             LocalizeStrings.cpp
             Resolution.cpp
-            Shader.cpp
             StereoscopicsManager.cpp
             TextureBundle.cpp
             TextureBundleXBT.cpp
@@ -73,7 +72,6 @@ set(SOURCES DDSImage.cpp
             XBTFReader.cpp)
 
 set(HEADERS DDSImage.h
-            DirectXGraphics.h
             DirtyRegion.h
             DirtyRegionSolvers.h
             DirtyRegionTracker.h
@@ -94,6 +92,7 @@ set(HEADERS DDSImage.h
             GUIControlGroup.h
             GUIControlGroupList.h
             GUIControlProfiler.h
+            GUIControlLookup.h
             GUIDialog.h
             GUIEditControl.h
             GUIFadeLabelControl.h
@@ -149,7 +148,6 @@ set(HEADERS DDSImage.h
             IWindowManagerCallback.h
             LocalizeStrings.h
             Resolution.h
-            Shader.h
             StereoscopicsManager.h
             Texture.h
             TextureBundle.h
@@ -166,10 +164,12 @@ if(OPENGL_FOUND)
   list(APPEND SOURCES GUIFontTTFGL.cpp
                       GUITextureGL.cpp
                       MatrixGLES.cpp
+                      Shader.cpp
                       TextureGL.cpp)
   list(APPEND HEADERS GUIFontTTFGL.h
                       GUITextureGL.h
                       MatrixGLES.h
+                      Shader.h
                       TextureGL.h)
 endif()
 
@@ -178,23 +178,30 @@ if(OPENGLES_FOUND)
                       GUIShader.cpp
                       GUITextureGLES.cpp
                       MatrixGLES.cpp
-                      TextureGL.cpp
-                      TexturePi.cpp)
+                      Shader.cpp
+                      TextureGL.cpp)
   list(APPEND HEADERS GUIFontTTFGL.h
                       GUIShader.h
                       GUITextureGLES.h
                       MatrixGLES.h
-                      TextureGL.h
-                      TexturePi.h)
+                      Shader.h
+                      TextureGL.h)
+endif()
+
+if(CORE_PLATFORM_NAME_LC STREQUAL rbpi)
+  list(APPEND SOURCES TexturePi.cpp)
+  list(APPEND HEADERS TexturePi.h)
 endif()
 
 if(CORE_SYSTEM_NAME STREQUAL windows)
   list(APPEND SOURCES D3DResource.cpp
+                      DirectXGraphics.cpp
                       GUIFontTTFDX.cpp
                       GUIShaderDX.cpp
                       GUITextureD3D.cpp
                       TextureDX.cpp)
   list(APPEND HEADERS D3DResource.h
+                      DirectXGraphics.h
                       GUIFontTTFDX.h
                       GUIShaderDX.h
                       GUITextureD3D.h
@@ -213,9 +220,7 @@ if(CORE_SYSTEM_NAME STREQUAL windows)
                     guishader_interlaced_left.hlsl
                     guishader_multi_texture_blend.hlsl
                     guishader_texture.hlsl
-                    guishader_texture_noblend.hlsl
-                    guishader_video.hlsl
-                    guishader_video_control.hlsl)
+                    guishader_texture_noblend.hlsl)
   foreach(shader ${SHADERS_VERTEX})
     get_filename_component(file ${shader} NAME_WE)
     add_custom_command(OUTPUT ${file}.h

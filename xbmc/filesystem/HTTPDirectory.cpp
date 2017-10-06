@@ -33,8 +33,8 @@
 
 using namespace XFILE;
 
-CHTTPDirectory::CHTTPDirectory(void){}
-CHTTPDirectory::~CHTTPDirectory(void){}
+CHTTPDirectory::CHTTPDirectory(void) = default;
+CHTTPDirectory::~CHTTPDirectory(void) = default;
 
 bool CHTTPDirectory::GetDirectory(const CURL& url, CFileItemList &items)
 {
@@ -75,7 +75,7 @@ bool CHTTPDirectory::GetDirectory(const CURL& url, CFileItemList &items)
   while(http.ReadString(buffer, sizeof(buffer)-1))
   {
     std::string strBuffer = buffer;
-    std::string fileCharset(http.GetServerReportedCharset());
+    std::string fileCharset(http.GetProperty(XFILE::FILE_PROPERTY_CONTENT_CHARSET));
     if (!fileCharset.empty() && fileCharset != "UTF-8")
     {
       std::string converted;

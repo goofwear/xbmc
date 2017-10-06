@@ -25,14 +25,11 @@
 #include <string>
 #include <vector>
 
-#include "addons/AudioDecoder.h"
-#include "addons/BinaryAddonCache.h"
-#include "addons/IAddon.h"
-#include "addons/ImageDecoder.h"
 #include "Application.h"
 #include "ServiceBroker.h"
 #include "filesystem/File.h"
 #include "filesystem/SpecialProtocol.h"
+#include "guilib/LocalizeStrings.h"
 #include "LangInfo.h"
 #include "network/DNSNameCache.h"
 #include "profiles/ProfilesManager.h"
@@ -92,18 +89,18 @@ void CAdvancedSettings::OnSettingsUnloaded()
   m_initialized = false;
 }
 
-void CAdvancedSettings::OnSettingChanged(const CSetting *setting)
+void CAdvancedSettings::OnSettingChanged(std::shared_ptr<const CSetting> setting)
 {
   if (setting == NULL)
     return;
 
   const std::string &settingId = setting->GetId();
   if (settingId == CSettings::SETTING_DEBUG_SHOWLOGINFO)
-    SetDebugMode(((CSettingBool*)setting)->GetValue());
+    SetDebugMode(std::static_pointer_cast<const CSettingBool>(setting)->GetValue());
   else if (settingId == CSettings::SETTING_DEBUG_EXTRALOGGING)
-    m_extraLogEnabled = static_cast<const CSettingBool*>(setting)->GetValue();
+    m_extraLogEnabled = std::static_pointer_cast<const CSettingBool>(setting)->GetValue();
   else if (settingId == CSettings::SETTING_DEBUG_SETEXTRALOGLEVEL)
-    setExtraLogLevel(CSettingUtils::GetList(static_cast<const CSettingList*>(setting)));
+    setExtraLogLevel(CSettingUtils::GetList(std::static_pointer_cast<const CSettingList>(setting)));
 }
 
 void CAdvancedSettings::Initialize()
@@ -159,7 +156,6 @@ void CAdvancedSettings::Initialize()
   m_DXVAForceProcessorRenderer = true;
   m_DXVAAllowHqScaling = true;
   m_videoFpsDetect = 1;
-  m_videoBusyDialogDelay_ms = 500;
 
   m_mediacodecForceSoftwareRendering = false;
 
@@ -246,10 +242,11 @@ void CAdvancedSettings::Initialize()
   m_tvshowEnumRegExps.push_back(TVShowRegexp(true,"([0-9]{2})[\\.-]([0-9]{2})[\\.-]([0-9]{4})"));
   // foo.1x09* or just /1x09*
   m_tvshowEnumRegExps.push_back(TVShowRegexp(false,"[\\\\/\\._ \\[\\(-]([0-9]+)x([0-9]+(?:(?:[a-i]|\\.[1-9])(?![0-9]))?)([^\\\\/]*)$"));
-  // foo.103*, 103 foo
-  m_tvshowEnumRegExps.push_back(TVShowRegexp(false,"[\\\\/\\._ -]([0-9]+)([0-9][0-9](?:(?:[a-i]|\\.[1-9])(?![0-9]))?)([\\._ -][^\\\\/]*)$"));
   // Part I, Pt.VI, Part 1
   m_tvshowEnumRegExps.push_back(TVShowRegexp(false,"[\\/._ -]p(?:ar)?t[_. -]()([ivx]+|[0-9]+)([._ -][^\\/]*)$"));
+  // foo.103*, 103 foo
+  // XXX: This regex is greedy and will match years in show names.  It should always be last.
+  m_tvshowEnumRegExps.push_back(TVShowRegexp(false,"[\\\\/\\._ -]([0-9]+)([0-9][0-9](?:(?:[a-i]|\\.[1-9])(?![0-9]))?)([\\._ -][^\\\\/]*)$"));
 
   m_tvshowMultiPartEnumRegExp = "^[-_ex]+([0-9]+(?:(?:[a-i]|\\.[1-9])(?![0-9]))?)";
 
@@ -263,7 +260,7 @@ void CAdvancedSettings::Initialize()
   m_imageRes = 720;
   m_imageScalingAlgorithm = CPictureScalingAlgorithm::Default;
 
-  m_sambaclienttimeout = 10;
+  m_sambaclienttimeout = 30;
   m_sambadoscodepage = "";
   m_sambastatfiles = true;
 
@@ -277,9 +274,11 @@ void CAdvancedSettings::Initialize()
   m_bMusicLibraryAllItemsOnBottom = false;
   m_bMusicLibraryCleanOnUpdate = false;
   m_bMusicLibraryPromptFullTagScan = false;
+  m_bMusicLibraryArtistSortOnUpdate = false;
   m_iMusicLibraryRecentlyAddedItems = 25;
   m_strMusicLibraryAlbumFormat = "";
   m_prioritiseAPEv2tags = false;
+  m_musicUseArtistSortName = false;
   m_musicItemSeparator = " / ";
   m_musicArtistSeparators = { ";", " feat. ", " ft. " };
   m_videoItemSeparator = " / ";
@@ -295,7 +294,6 @@ void CAdvancedSettings::Initialize()
   m_bVideoScannerIgnoreErrors = false;
   m_iVideoLibraryDateAdded = 1; // prefer mtime over ctime and current time
 
-  m_iEpgLingerTime = 60 * 24;           /* keep 24 hours by default */
   m_iEpgUpdateCheckInterval = 300; /* check if tables need to be updated every 5 minutes */
   m_iEpgCleanupInterval = 900;     /* remove old entries from the EPG every 15 minutes */
   m_iEpgActiveTagCheckInterval = 60; /* check for updated active tags every minute */
@@ -318,7 +316,7 @@ void CAdvancedSettings::Initialize()
   m_screenAlign_xStretchFactor = 1.0;
   m_screenAlign_yStretchFactor = 1.0;
 
-  m_curlconnecttimeout = 10;
+  m_curlconnecttimeout = 30;
   m_curllowspeedtime = 20;
   m_curlretries = 2;
   m_curlDisableIPV6 = false;      //Certain hardware/OS combinations have trouble
@@ -370,13 +368,10 @@ void CAdvancedSettings::Initialize()
 
   m_enableMultimediaKeys = false;
 
-#if defined(TARGET_DARWIN_IOS)
-  m_canWindowed = false;
-#else
   m_canWindowed = true;
-#endif
   m_guiVisualizeDirtyRegions = false;
   m_guiAlgorithmDirtyRegions = 3;
+  m_guiSmartRedraw = false;
   m_airTunesPort = 36666;
   m_airPlayPort = 36667;
 
@@ -385,7 +380,7 @@ void CAdvancedSettings::Initialize()
 
   m_pictureExtensions = ".png|.jpg|.jpeg|.bmp|.gif|.ico|.tif|.tiff|.tga|.pcx|.cbz|.zip|.cbr|.rar|.rss|.webp|.jp2|.apng";
   m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.gdm|.imf|.m15|.sfx|.uni|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.dsp|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.wtv|.mka|.tak|.opus|.dff|.dsf|.m4b";
-  m_videoExtensions = ".m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.mpd|.m3u|.m3u8|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.mk3d|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls|.webm|.bdmv|.wtv";
+  m_videoExtensions = ".m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.mpd|.m3u|.m3u8|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.udf|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.mk3d|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls|.webm|.bdmv|.wtv";
   m_subtitlesExtensions = ".utf|.utf8|.utf-8|.sub|.srt|.smi|.rt|.txt|.ssa|.text|.ssa|.aqt|.jss|.ass|.idx|.ifo|.rar|.zip";
   m_discStubExtensions = ".disc";
   // internal music extensions
@@ -685,10 +680,6 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     //0 = disable fps detect, 1 = only detect on timestamps with uniform spacing, 2 detect on all timestamps
     XMLUtils::GetInt(pElement, "fpsdetect", m_videoFpsDetect, 0, 2);
 
-    // controls the delay, in milliseconds, until
-    // the busy dialog is shown when starting video playback.
-    XMLUtils::GetInt(pElement, "busydialogdelayms", m_videoBusyDialogDelay_ms, 0, 1000);
-
     // Store global display latency settings
     TiXmlElement* pVideoLatency = pElement->FirstChildElement("latency");
     if (pVideoLatency)
@@ -735,6 +726,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetBoolean(pElement, "allitemsonbottom", m_bMusicLibraryAllItemsOnBottom);
     XMLUtils::GetBoolean(pElement, "cleanonupdate", m_bMusicLibraryCleanOnUpdate);
     XMLUtils::GetBoolean(pElement, "promptfulltagscan", m_bMusicLibraryPromptFullTagScan);
+    XMLUtils::GetBoolean(pElement, "artistsortonupdate", m_bMusicLibraryArtistSortOnUpdate);
+    XMLUtils::GetBoolean(pElement, "useartistsortname", m_musicUseArtistSortName);
     XMLUtils::GetString(pElement, "albumformat", m_strMusicLibraryAlbumFormat);
     XMLUtils::GetString(pElement, "itemseparator", m_musicItemSeparator);
     XMLUtils::GetInt(pElement, "dateadded", m_iMusicLibraryDateAdded);
@@ -837,7 +830,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     const char* hide = pElement->Attribute("hide");
     if (hide == NULL || strnicmp("false", hide, 4) != 0)
     {
-      CSetting *setting = CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_DEBUG_SHOWLOGINFO);
+      SettingPtr setting = CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_DEBUG_SHOWLOGINFO);
       if (setting != NULL)
         setting->SetVisible(false);
     }
@@ -877,7 +870,6 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   pElement = pRootElement->FirstChildElement("epg");
   if (pElement)
   {
-    XMLUtils::GetInt(pElement, "lingertime", m_iEpgLingerTime);
     XMLUtils::GetInt(pElement, "updatecheckinterval", m_iEpgUpdateCheckInterval);
     XMLUtils::GetInt(pElement, "cleanupinterval", m_iEpgCleanupInterval);
     XMLUtils::GetInt(pElement, "activetagcheckinterval", m_iEpgActiveTagCheckInterval);
@@ -1190,6 +1182,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   {
     XMLUtils::GetBoolean(pElement, "visualizedirtyregions", m_guiVisualizeDirtyRegions);
     XMLUtils::GetInt(pElement, "algorithmdirtyregions",     m_guiAlgorithmDirtyRegions);
+    XMLUtils::GetBoolean(pElement, "smartredraw", m_guiSmartRedraw);
   }
 
   std::string seekSteps;
@@ -1203,7 +1196,7 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   }
 
   // load in the settings overrides
-  CServiceBroker::GetSettings().Load(pRootElement, true);  // true to hide the settings we read in
+  CServiceBroker::GetSettings().LoadHidden(pRootElement);
 }
 
 void CAdvancedSettings::Clear()
@@ -1346,17 +1339,17 @@ void CAdvancedSettings::AddSettingsFile(const std::string &filename)
   m_settingsFiles.push_back(filename);
 }
 
-float CAdvancedSettings::GetDisplayLatency(float refreshrate)
+float CAdvancedSettings::GetLatencyTweak(float refreshrate)
 {
-  float delay = m_videoDefaultLatency / 1000.0f;
+  float delay = m_videoDefaultLatency;
   for (int i = 0; i < (int) m_videoRefreshLatency.size(); i++)
   {
     RefreshVideoLatency& videolatency = m_videoRefreshLatency[i];
     if (refreshrate >= videolatency.refreshmin && refreshrate <= videolatency.refreshmax)
-      delay = videolatency.delay / 1000.0f;
+      delay = videolatency.delay;
   }
 
-  return delay; // in seconds
+  return delay; // in milliseconds
 }
 
 void CAdvancedSettings::SetDebugMode(bool debug)
@@ -1385,13 +1378,14 @@ bool CAdvancedSettings::CanLogComponent(int component) const
   return ((m_extraLogLevels & component) == component);
 }
 
-void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(SettingConstPtr setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
 {
   list.push_back(std::make_pair(g_localizeStrings.Get(669), LOGSAMBA));
   list.push_back(std::make_pair(g_localizeStrings.Get(670), LOGCURL));
   list.push_back(std::make_pair(g_localizeStrings.Get(672), LOGFFMPEG));
   list.push_back(std::make_pair(g_localizeStrings.Get(676), LOGAUDIO));
   list.push_back(std::make_pair(g_localizeStrings.Get(680), LOGVIDEO));
+  list.push_back(std::make_pair(g_localizeStrings.Get(683), LOGAVTIMING));
 #ifdef HAS_DBUS
   list.push_back(std::make_pair(g_localizeStrings.Get(674), LOGDBUS));
 #endif
@@ -1410,6 +1404,7 @@ void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(const CSetting *se
 #ifdef HAVE_LIBCEC
   list.push_back(std::make_pair(g_localizeStrings.Get(679), LOGCEC));
 #endif
+  list.push_back(std::make_pair(g_localizeStrings.Get(682), LOGDATABASE));
 }
 
 void CAdvancedSettings::setExtraLogLevel(const std::vector<CVariant> &components)
@@ -1422,38 +1417,4 @@ void CAdvancedSettings::setExtraLogLevel(const std::vector<CVariant> &components
 
     m_extraLogLevels |= static_cast<int>(it->asInteger());
   }
-}
-
-std::string CAdvancedSettings::GetMusicExtensions() const
-{
-  std::string result(m_musicExtensions);
-
-  VECADDONS codecs;
-  CBinaryAddonCache &addonCache = CServiceBroker::GetBinaryAddonCache();
-  addonCache.GetAddons(codecs, ADDON_AUDIODECODER);
-  for (size_t i=0;i<codecs.size();++i)
-  {
-    std::shared_ptr<CAudioDecoder> dec(std::static_pointer_cast<CAudioDecoder>(codecs[i]));
-    result += '|';
-    result += dec->GetExtensions();
-  }
-
-  return result;
-}
-
-std::string CAdvancedSettings::GetPictureExtensions() const
-{
-  std::string result(m_pictureExtensions);
-
-  VECADDONS codecs;
-  CBinaryAddonCache &addonCache = CServiceBroker::GetBinaryAddonCache();
-  addonCache.GetAddons(codecs, ADDON_IMAGEDECODER);
-  for (size_t i=0;i<codecs.size();++i)
-  {
-    std::shared_ptr<CImageDecoder> dec(std::static_pointer_cast<CImageDecoder>(codecs[i]));
-    result += '|';
-    result += dec->GetExtensions();
-  }
-
-  return result;
 }

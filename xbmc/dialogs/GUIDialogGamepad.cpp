@@ -23,12 +23,14 @@
 #include "utils/StringUtils.h"
 #include "guilib/GUIAudioManager.h"
 #include "guilib/GUIWindowManager.h"
-#include "GUIDialogOK.h"
 #include "input/Key.h"
 #include "guilib/LocalizeStrings.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "utils/Variant.h"
 
 #include <utility>
+
+using namespace KODI::MESSAGING;
 
 CGUIDialogGamepad::CGUIDialogGamepad(void)
     : CGUIDialogBoxBase(WINDOW_DIALOG_GAMEPAD, "DialogConfirm.xml")
@@ -40,8 +42,7 @@ CGUIDialogGamepad::CGUIDialogGamepad(void)
   m_cHideInputChar = '*';
 }
 
-CGUIDialogGamepad::~CGUIDialogGamepad(void)
-{}
+CGUIDialogGamepad::~CGUIDialogGamepad(void) = default;
 
 void CGUIDialogGamepad::OnInitWindow()
 {
@@ -209,7 +210,7 @@ bool CGUIDialogGamepad::ShowAndVerifyNewPassword(std::string& strNewPassword)
   if (ShowAndVerifyInput(strUserInput, "12340", "12330", "12331", "", true, true))
   {
     //! @todo Show error to user saying the password entry was blank
-    CGUIDialogOK::ShowAndGetInput(CVariant{12357}, CVariant{12358}); // Password is empty/blank
+    HELPERS::ShowOKDialogText(CVariant{12357}, CVariant{12358}); // Password is empty/blank
     return false;
   }
 
@@ -221,7 +222,7 @@ bool CGUIDialogGamepad::ShowAndVerifyNewPassword(std::string& strNewPassword)
   if (!ShowAndVerifyInput(strUserInput, "12341", "12330", "12331", "", false, true))
   {
     //! @todo Show error to user saying the password re-entry failed
-    CGUIDialogOK::ShowAndGetInput(CVariant{12357}, CVariant{12344}); // Password do not match
+    HELPERS::ShowOKDialogText(CVariant{12357}, CVariant{12344}); // Password do not match
     return false;
   }
 
@@ -274,7 +275,7 @@ bool CGUIDialogGamepad::ShowAndVerifyInput(std::string& strToVerify, const std::
     const std::string& dlgLine2, bool bGetUserInput, bool bHideInputChars)
 {
   // Prompt user for password input
-  CGUIDialogGamepad *pDialog = g_windowManager.GetWindow<CGUIDialogGamepad>();
+  CGUIDialogGamepad *pDialog = g_windowManager.GetWindow<CGUIDialogGamepad>(WINDOW_DIALOG_GAMEPAD);
   pDialog->m_strPassword = strToVerify;
   pDialog->m_bUserInputCleanup = !bGetUserInput;
   pDialog->m_bHideInputChars = bHideInputChars;

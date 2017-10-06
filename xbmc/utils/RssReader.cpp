@@ -177,7 +177,7 @@ void CRssReader::Process()
         {
           if (http.Get(strUrl, strXML))
           {
-            fileCharset = http.GetServerReportedCharset();
+            fileCharset = http.GetProperty(XFILE::FILE_PROPERTY_CONTENT_CHARSET);
             CLog::Log(LOGDEBUG, "Got rss feed: %s", strUrl.c_str());
             break;
           }
@@ -269,11 +269,11 @@ void CRssReader::GetNewsItems(TiXmlElement* channelXmlNode, int iFeed)
   if (m_tagSet.empty())
     AddTag("title");
 
-  while (itemNode > 0)
+  while (itemNode != nullptr)
   {
     TiXmlNode* childNode = itemNode->FirstChild();
     mTagElements.clear();
-    while (childNode > 0)
+    while (childNode != nullptr)
     {
       std::string strName = childNode->ValueStr();
 

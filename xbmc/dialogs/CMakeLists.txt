@@ -4,7 +4,6 @@ set(SOURCES GUIDialogBoxBase.cpp
             GUIDialogCache.cpp
             GUIDialogContextMenu.cpp
             GUIDialogExtendedProgressBar.cpp
-            GUIDialogFavourites.cpp
             GUIDialogFileBrowser.cpp
             GUIDialogGamepad.cpp
             GUIDialogKaiToast.cpp
@@ -35,7 +34,6 @@ set(HEADERS GUIDialogBoxBase.h
             GUIDialogCache.h
             GUIDialogContextMenu.h
             GUIDialogExtendedProgressBar.h
-            GUIDialogFavourites.h
             GUIDialogFileBrowser.h
             GUIDialogGamepad.h
             GUIDialogKaiToast.h
@@ -58,6 +56,7 @@ set(HEADERS GUIDialogBoxBase.h
             GUIDialogSubMenu.h
             GUIDialogTextViewer.h
             GUIDialogVolumeBar.h
-            GUIDialogYesNo.h)
+            GUIDialogYesNo.h
+            IGUIVolumeBarCallback.h)
 
 core_add_library(dialogs)

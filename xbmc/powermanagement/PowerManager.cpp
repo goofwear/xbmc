@@ -49,7 +49,6 @@
 #include "linux/FallbackPowerSyscall.h"
 #if defined(HAS_DBUS)
 #include "linux/ConsoleUPowerSyscall.h"
-#include "linux/ConsoleDeviceKitPowerSyscall.h"
 #include "linux/LogindUPowerSyscall.h"
 #include "linux/UPowerSyscall.h"
 #endif // HAS_DBUS
@@ -92,8 +91,6 @@ void CPowerManager::Initialize()
   {
     std::make_pair(CConsoleUPowerSyscall::HasConsoleKitAndUPower,
                    [] { return new CConsoleUPowerSyscall(); }),
-    std::make_pair(CConsoleDeviceKitPowerSyscall::HasDeviceConsoleKit,
-                   [] { return new CConsoleDeviceKitPowerSyscall(); }),
     std::make_pair(CLogindUPowerSyscall::HasLogind,
                    [] { return new CLogindUPowerSyscall(); }),
     std::make_pair(CUPowerSyscall::HasUPower,
@@ -168,14 +165,14 @@ void CPowerManager::SetDefaults()
     break;
   }
 
-  ((CSettingInt*)CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_POWERMANAGEMENT_SHUTDOWNSTATE))->SetDefault(defaultShutdown);
+  std::static_pointer_cast<CSettingInt>(CServiceBroker::GetSettings().GetSetting(CSettings::SETTING_POWERMANAGEMENT_SHUTDOWNSTATE))->SetDefault(defaultShutdown);
 }
 
 bool CPowerManager::Powerdown()
 {
   if (CanPowerdown() && m_instance->Powerdown())
   {
-    CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>();
+    CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
     if (dialog)
       dialog->Open();
 
@@ -203,7 +200,7 @@ bool CPowerManager::Reboot()
   {
     CAnnouncementManager::GetInstance().Announce(System, "xbmc", "OnRestart");
 
-    CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>();
+    CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
     if (dialog)
       dialog->Open();
   }
@@ -245,7 +242,7 @@ void CPowerManager::OnSleep()
 {
   CAnnouncementManager::GetInstance().Announce(System, "xbmc", "OnSleep");
 
-  CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>();
+  CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
   if (dialog)
     dialog->Open();
 
@@ -275,7 +272,7 @@ void CPowerManager::OnWake()
   // reset out timers
   g_application.ResetShutdownTimers();
 
-  CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>();
+  CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
   if (dialog)
     dialog->Close(true); // force close. no closing animation, sound etc at this early stage
 
@@ -313,7 +310,7 @@ void CPowerManager::OnLowBattery()
   CAnnouncementManager::GetInstance().Announce(System, "xbmc", "OnLowBattery");
 }
 
-void CPowerManager::SettingOptionsShutdownStatesFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+void CPowerManager::SettingOptionsShutdownStatesFiller(SettingConstPtr setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
 {
   if (g_powerManager.CanPowerdown())
     list.push_back(make_pair(g_localizeStrings.Get(13005), POWERSTATE_SHUTDOWN));

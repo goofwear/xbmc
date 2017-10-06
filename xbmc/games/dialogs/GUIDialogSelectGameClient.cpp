@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -19,6 +19,7 @@
  */
 
 #include "GUIDialogSelectGameClient.h"
+#include "ServiceBroker.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonManager.h"
 #include "addons/GUIWindowAddonBrowser.h"
@@ -26,12 +27,17 @@
 #include "games/addons/GameClient.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/WindowIDs.h"
+#include "messaging/helpers/DialogOKHelper.h" 
 #include "utils/log.h"
 
+using namespace KODI;
+using namespace KODI::MESSAGING;
 using namespace GAME;
 
-bool CGUIDialogSelectGameClient::ShowAndGetGameClient(const GameClientVector& candidates, const GameClientVector& installable, GameClientPtr& gameClient)
+std::string CGUIDialogSelectGameClient::ShowAndGetGameClient(const GameClientVector& candidates, const GameClientVector& installable)
 {
+  std::string gameClient;
+
   CLog::Log(LOGDEBUG, "Select game client dialog: Found %lu candidates", candidates.size());
   for (const auto& gameClient : candidates)
     CLog::Log(LOGDEBUG, "Adding %s as a candidate", gameClient->ID().c_str());
@@ -65,7 +71,7 @@ bool CGUIDialogSelectGameClient::ShowAndGetGameClient(const GameClientVector& ca
   if (0 <= result && result < static_cast<int>(candidates.size()))
   {
     // Handle emulator
-    gameClient = candidates[result];
+    gameClient = candidates[result]->ID();
   }
   else if (result == iInstallEmulator)
   {
@@ -82,14 +88,14 @@ bool CGUIDialogSelectGameClient::ShowAndGetGameClient(const GameClientVector& ca
     CLog::Log(LOGDEBUG, "Select game client dialog: User cancelled game client selection");
   }
 
-  return gameClient.get() != nullptr;
+  return gameClient;
 }
 
-GameClientPtr CGUIDialogSelectGameClient::InstallGameClient(const GameClientVector& installable)
+std::string CGUIDialogSelectGameClient::InstallGameClient(const GameClientVector& installable)
 {
   using namespace ADDON;
 
-  GameClientPtr gameClient;
+  std::string gameClient;
 
   //! @todo Switch to add-on browser when more emulators have icons
   /*
@@ -98,10 +104,10 @@ GameClientPtr CGUIDialogSelectGameClient::InstallGameClient(const GameClientVect
   {
     CLog::Log(LOGDEBUG, "Select game client dialog: User installed %s", chosenClientId.c_str());
     AddonPtr addon;
-    if (CAddonMgr::GetInstance().GetAddon(chosenClientId, addon, ADDON_GAMEDLL))
-      gameClient = std::dynamic_pointer_cast<CGameClient>(addon);
+    if (CServiceBroker::GetAddonMgr().GetAddon(chosenClientId, addon, ADDON_GAMEDLL))
+      gameClient = addon->ID();
 
-    if (!gameClient)
+    if (gameClient.empty())
       CLog::Log(LOGERROR, "Select game client dialog: Failed to get addon %s", chosenClientId.c_str());
   }
   */
@@ -130,14 +136,17 @@ GameClientPtr CGUIDialogSelectGameClient::InstallGameClient(const GameClientVect
       CLog::Log(LOGDEBUG, "Select game client dialog: Successfully installed %s", installedAddon->ID().c_str());
 
       // if the addon is disabled we need to enable it
-      if (CAddonMgr::GetInstance().IsAddonDisabled(installedAddon->ID()))
-        CAddonMgr::GetInstance().EnableAddon(installedAddon->ID());
+      if (CServiceBroker::GetAddonMgr().IsAddonDisabled(installedAddon->ID()))
+        CServiceBroker::GetAddonMgr().EnableAddon(installedAddon->ID());
 
-      gameClient = std::dynamic_pointer_cast<CGameClient>(installedAddon);
+      gameClient = installedAddon->ID();
     }
     else
     {
       CLog::Log(LOGERROR, "Select game client dialog: Failed to install %s", gameClientId.c_str());
+      // "Error"
+      // "Failed to install add-on."
+      HELPERS::ShowOKDialogText(257, 35256);
     }
   }
   else if (result == iAddonBrowser)

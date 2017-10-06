@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2016 Team Kodi
+ *      Copyright (C) 2016-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -21,6 +21,8 @@
 
 #include "IGameClientPlayback.h"
 
+namespace KODI
+{
 namespace GAME
 {
   class CGameClientRealtimePlayback : public IGameClientPlayback
@@ -31,14 +33,15 @@ namespace GAME
     // implementation of IGameClientPlayback
     virtual bool CanPause() const override { return false; }
     virtual bool CanSeek() const override { return false; }
-    virtual void PauseUnpause() override { }
     virtual unsigned int GetTimeMs() const override { return 0; }
     virtual unsigned int GetTotalTimeMs() const override { return 0; }
     virtual unsigned int GetCacheTimeMs() const override { return 0; }
     virtual void SeekTimeMs(unsigned int timeMs) override { }
     virtual double GetSpeed() const override { return 1.0; }
     virtual void SetSpeed(double speedFactor) override { }
-    virtual std::string CreateManualSavestate() override { return ""; }
+    virtual void PauseAsync() override { }
+    virtual std::string CreateSavestate() override { return ""; }
     virtual bool LoadSavestate(const std::string& path) override { return false; }
   };
+}
 }

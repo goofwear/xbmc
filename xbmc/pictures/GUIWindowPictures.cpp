@@ -34,8 +34,8 @@
 #include "PictureInfoLoader.h"
 #include "guilib/GUIWindowManager.h"
 #include "input/Key.h"
-#include "dialogs/GUIDialogOK.h"
 #include "view/GUIViewState.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "PlayListPlayer.h"
 #include "playlists/PlayList.h"
 #include "settings/MediaSourceSettings.h"
@@ -60,6 +60,7 @@
 
 using namespace XFILE;
 using namespace PLAYLIST;
+using namespace KODI::MESSAGING;
 
 #define CONTROL_BTNSLIDESHOW   6
 #define CONTROL_BTNSLIDESHOW_RECURSIVE   7
@@ -78,7 +79,7 @@ void CGUIWindowPictures::OnInitWindow()
   CGUIMediaWindow::OnInitWindow();
   if (m_slideShowStarted)
   {
-    CGUIWindowSlideShow* wndw = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+    CGUIWindowSlideShow* wndw = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
     std::string path;
     if (wndw && wndw->GetCurrentSlide())
       path = URIUtils::GetDirectory(wndw->GetCurrentSlide()->GetPath());
@@ -92,9 +93,7 @@ void CGUIWindowPictures::OnInitWindow()
   }
 }
 
-CGUIWindowPictures::~CGUIWindowPictures(void)
-{
-}
+CGUIWindowPictures::~CGUIWindowPictures(void) = default;
 
 bool CGUIWindowPictures::OnMessage(CGUIMessage& message)
 {
@@ -114,7 +113,7 @@ bool CGUIWindowPictures::OnMessage(CGUIMessage& message)
       if (m_vecItems->GetPath() == "?" && message.GetStringParam().empty())
         message.SetStringParam(CMediaSourceSettings::GetInstance().GetDefaultSource("pictures"));
 
-      m_dlgProgress = g_windowManager.GetWindow<CGUIDialogProgress>();
+      m_dlgProgress = g_windowManager.GetWindow<CGUIDialogProgress>(WINDOW_DIALOG_PROGRESS);
     }
     break;
 
@@ -325,7 +324,7 @@ bool CGUIWindowPictures::ShowPicture(int iItem, bool startSlideShow)
   if (pItem->m_bIsShareOrDrive)
     return false;
 
-  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (!pSlideShow)
     return false;
   if (g_application.m_pPlayer->IsPlayingVideo())
@@ -367,7 +366,7 @@ bool CGUIWindowPictures::ShowPicture(int iItem, bool startSlideShow)
 
 void CGUIWindowPictures::OnShowPictureRecursive(const std::string& strPath)
 {
-  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (pSlideShow)
   {
     // stop any video
@@ -387,7 +386,7 @@ void CGUIWindowPictures::OnShowPictureRecursive(const std::string& strPath)
 
 void CGUIWindowPictures::OnSlideShowRecursive(const std::string &strPicture)
 {
-  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (pSlideShow)
   {   
     std::string strExtensions;
@@ -422,7 +421,7 @@ void CGUIWindowPictures::OnSlideShow()
 
 void CGUIWindowPictures::OnSlideShow(const std::string &strPicture)
 {
-  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+  CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
   if (pSlideShow)
   {    
     std::string strExtensions;
@@ -550,7 +549,7 @@ void CGUIWindowPictures::LoadPlayList(const std::string& strPlayList)
   {
     if (!pPlayList->Load(strPlayList))
     {
-      CGUIDialogOK::ShowAndGetInput(CVariant{6}, CVariant{477});
+      HELPERS::ShowOKDialogText(CVariant{6}, CVariant{477});
       return ; //hmmm unable to load playlist?
     }
   }
@@ -559,7 +558,7 @@ void CGUIWindowPictures::LoadPlayList(const std::string& strPlayList)
   if (playlist.size() > 0)
   {
     // set up slideshow
-    CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>();
+    CGUIWindowSlideShow *pSlideShow = g_windowManager.GetWindow<CGUIWindowSlideShow>(WINDOW_SLIDESHOW);
     if (!pSlideShow)
       return;
     if (g_application.m_pPlayer->IsPlayingVideo())
@@ -594,7 +593,7 @@ void CGUIWindowPictures::OnItemInfo(int itemNumber)
   }
   if (item->m_bIsFolder || item->IsZIP() || item->IsRAR() || item->IsCBZ() || item->IsCBR() || !item->IsPicture())
     return;
-  CGUIDialogPictureInfo *pictureInfo = g_windowManager.GetWindow<CGUIDialogPictureInfo>();
+  CGUIDialogPictureInfo *pictureInfo = g_windowManager.GetWindow<CGUIDialogPictureInfo>(WINDOW_DIALOG_PICTURE_INFO);
   if (pictureInfo)
   {
     pictureInfo->SetPicture(item.get());

@@ -37,6 +37,7 @@
 #include "AutoSwitch.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
 #include "addons/Addon.h"
 #include "addons/AddonManager.h"
 #include "addons/PluginSource.h"
@@ -51,6 +52,7 @@
 #define PROPERTY_SORT_ORDER         "sort.order"
 #define PROPERTY_SORT_ASCENDING     "sort.ascending"
 
+using namespace KODI;
 using namespace ADDON;
 using namespace PVR;
 
@@ -188,8 +190,7 @@ CGUIViewState::CGUIViewState(const CFileItemList& items) : m_items(items)
   m_playlist = PLAYLIST_NONE;
 }
 
-CGUIViewState::~CGUIViewState()
-{ }
+CGUIViewState::~CGUIViewState() = default;
 
 SortOrder CGUIViewState::SetNextSortOrder()
 {
@@ -347,7 +348,7 @@ void CGUIViewState::SetSortMethod(SortDescription sortDescription)
 bool CGUIViewState::ChooseSortMethod()
 {
   
-  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>();
+  CGUIDialogSelect *dialog = g_windowManager.GetWindow<CGUIDialogSelect>(WINDOW_DIALOG_SELECT);
   if (!dialog)
     return false;
   dialog->Reset();
@@ -416,7 +417,7 @@ void CGUIViewState::SetPlaylistDirectory(const std::string& strDirectory)
 
 bool CGUIViewState::IsCurrentPlaylistDirectory(const std::string& strDirectory)
 {
-  if (g_playlistPlayer.GetCurrentPlaylist()!=GetPlaylist())
+  if (CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist()!=GetPlaylist())
     return false;
 
   std::string strDir = strDirectory;
@@ -570,7 +571,7 @@ CGUIViewStateFromItems::CGUIViewStateFromItems(const CFileItemList &items) : CGU
   {
     CURL url(items.GetPath());
     AddonPtr addon;
-    if (CAddonMgr::GetInstance().GetAddon(url.GetHostName(), addon, ADDON_PLUGIN))
+    if (CServiceBroker::GetAddonMgr().GetAddon(url.GetHostName(), addon, ADDON_PLUGIN))
     {
       PluginPtr plugin = std::static_pointer_cast<CPluginSource>(addon);
       if (plugin->Provides(CPluginSource::AUDIO))

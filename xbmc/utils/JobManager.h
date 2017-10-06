@@ -31,10 +31,10 @@ class CJobManager;
 class CJobWorker : public CThread
 {
 public:
-  CJobWorker(CJobManager *manager);
-  virtual ~CJobWorker();
+  explicit CJobWorker(CJobManager *manager);
+  ~CJobWorker() override;
 
-  void Process();
+  void Process() override;
 private:
   CJobManager  *m_jobManager;
 };
@@ -57,7 +57,7 @@ class CJobQueue: public IJobCallback
   class CJobPointer
   {
   public:
-    CJobPointer(CJob *job)
+    explicit CJobPointer(CJob *job)
     {
       m_job = job;
       m_id = 0;
@@ -92,7 +92,7 @@ public:
    Cancels any in-process jobs, and destroys the job queue.
    \sa CJob
    */
-  virtual ~CJobQueue();
+  ~CJobQueue() override;
 
   /*!
    \brief Add a job to the queue
@@ -138,7 +138,7 @@ public:
 
    \sa CJobManager, IJobCallback and  CJob
    */
-  virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job);
+  void OnJobComplete(unsigned int jobID, bool success, CJob *job) override;
 
 protected:
   /*!
@@ -248,6 +248,15 @@ public:
   }
 
   /*!
+   \brief Add a function f to this job manager for asynchronously execution.
+   */
+  template<typename F>
+  void Submit(F&& f, IJobCallback *callback, CJob::PRIORITY priority = CJob::PRIORITY_LOW)
+  {
+    AddJob(new CLambdaJob<F>(std::forward<F>(f)), callback, priority);
+  }
+
+  /*!
    \brief Cancel a job with the given id.
    \param jobID the id of the job to cancel, retrieved previously from AddJob()
    \sa AddJob()
@@ -331,8 +340,8 @@ protected:
 private:
   // private construction, and no assignments; use the provided singleton methods
   CJobManager();
-  CJobManager(const CJobManager&);
-  CJobManager const& operator=(CJobManager const&);
+  CJobManager(const CJobManager&) = delete;
+  CJobManager const& operator=(CJobManager const&) = delete;
   virtual ~CJobManager();
 
   /*! \brief Pop a job off the job queue and add to the processing queue ready to process

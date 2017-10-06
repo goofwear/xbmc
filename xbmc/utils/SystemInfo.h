@@ -61,7 +61,7 @@ class CSysInfoJob : public CJob
 public:
   CSysInfoJob();
 
-  virtual bool DoWork();
+  bool DoWork() override;
   const CSysData &GetData() const;
 
   static CSysData::INTERNET_STATE GetInternetState();
@@ -83,7 +83,6 @@ public:
   enum WindowsVersion
   {
     WindowsVersionUnknown = -1, // Undetected, unsupported Windows version or OS in not Windows
-    WindowsVersionVista,        // Windows Vista, Windows Server 2008
     WindowsVersionWin7,         // Windows 7, Windows Server 2008 R2
     WindowsVersionWin8,         // Windows 8, Windows Server 2012
     WindowsVersionWin8_1,       // Windows 8.1
@@ -93,10 +92,10 @@ public:
   };
 
   CSysInfo(void);
-  virtual ~CSysInfo();
+  ~CSysInfo() override;
 
-  virtual bool Load(const TiXmlNode *settings) override;
-  virtual bool Save(TiXmlNode *settings) const override;
+  bool Load(const TiXmlNode *settings) override;
+  bool Save(TiXmlNode *settings) const override;
 
   char MD5_Sign[32 + 1];
 
@@ -147,9 +146,9 @@ public:
   std::string GetPrivacyPolicy();
 
 protected:
-  virtual CJob *GetJob() const override;
-  virtual std::string TranslateInfo(int info) const override;
-  virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job) override;
+  CJob *GetJob() const override;
+  std::string TranslateInfo(int info) const override;
+  void OnJobComplete(unsigned int jobID, bool success, CJob *job) override;
 
 private:
   CSysData m_info;

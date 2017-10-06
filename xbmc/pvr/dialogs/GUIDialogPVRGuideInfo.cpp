@@ -18,14 +18,17 @@
  *
  */
 
+#include "GUIDialogPVRGuideInfo.h"
+
+#include <utility>
+
 #include "Application.h"
-#include "dialogs/GUIDialogOK.h"
+#include "ServiceBroker.h"
 #include "dialogs/GUIDialogYesNo.h"
-#include "epg/EpgInfoTag.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/ApplicationMessenger.h"
-#include "ServiceBroker.h"
+#include "messaging/helpers/DialogOKHelper.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 
@@ -33,15 +36,11 @@
 #include "pvr/PVRManager.h"
 #include "pvr/addons/PVRClients.h"
 #include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "pvr/epg/EpgInfoTag.h"
 #include "pvr/timers/PVRTimerInfoTag.h"
 #include "pvr/windows/GUIWindowPVRSearch.h"
 
-#include "GUIDialogPVRGuideInfo.h"
-
-#include <utility>
-
 using namespace PVR;
-using namespace EPG;
 using namespace KODI::MESSAGING;
 
 #define CONTROL_BTN_FIND                4
@@ -50,16 +49,14 @@ using namespace KODI::MESSAGING;
 #define CONTROL_BTN_OK                  7
 #define CONTROL_BTN_PLAY_RECORDING      8
 #define CONTROL_BTN_ADD_TIMER           9
-#define CONTROL_BTN_CHANNEL_GUIDE       10
+#define CONTROL_BTN_PLAY_EPGTAG        10
 
 CGUIDialogPVRGuideInfo::CGUIDialogPVRGuideInfo(void)
     : CGUIDialog(WINDOW_DIALOG_PVR_GUIDE_INFO, "DialogPVRInfo.xml")
 {
 }
 
-CGUIDialogPVRGuideInfo::~CGUIDialogPVRGuideInfo(void)
-{
-}
+CGUIDialogPVRGuideInfo::~CGUIDialogPVRGuideInfo(void) = default;
 
 bool CGUIDialogPVRGuideInfo::OnClickButtonOK(CGUIMessage &message)
 {
@@ -74,26 +71,6 @@ bool CGUIDialogPVRGuideInfo::OnClickButtonOK(CGUIMessage &message)
   return bReturn;
 }
 
-bool CGUIDialogPVRGuideInfo::OnClickButtonChannelGuide(CGUIMessage &message)
-{
-  bool bReturn = false;
-
-  if (message.GetSenderId() == CONTROL_BTN_CHANNEL_GUIDE)
-  {
-    if (!m_progItem || !m_progItem->HasPVRChannel())
-    {
-      /* invalid channel */
-      CGUIDialogOK::ShowAndGetInput(CVariant{19033}, CVariant{19136}); // Information, Channel unavailable
-      Close();
-      return bReturn;
-    }
-
-    bReturn = CServiceBroker::GetPVRManager().GUIActions()->ShowChannelEPG(CFileItemPtr(new CFileItem(m_progItem)));
-  }
-
-  return bReturn;
-}
-
 bool CGUIDialogPVRGuideInfo::OnClickButtonRecord(CGUIMessage &message)
 {
   bool bReturn = false;
@@ -102,10 +79,10 @@ bool CGUIDialogPVRGuideInfo::OnClickButtonRecord(CGUIMessage &message)
   {
     bReturn = true;
 
-    if (!m_progItem || !m_progItem->HasPVRChannel())
+    if (!m_progItem || !m_progItem->HasChannel())
     {
       /* invalid channel */
-      CGUIDialogOK::ShowAndGetInput(CVariant{19033}, CVariant{19067});
+      HELPERS::ShowOKDialogText(CVariant{19033}, CVariant{19067});
       Close();
       return bReturn;
     }
@@ -155,13 +132,17 @@ bool CGUIDialogPVRGuideInfo::OnClickButtonPlay(CGUIMessage &message)
 {
   bool bReturn = false;
 
-  if (message.GetSenderId() == CONTROL_BTN_SWITCH || message.GetSenderId() == CONTROL_BTN_PLAY_RECORDING)
+  if (message.GetSenderId() == CONTROL_BTN_SWITCH ||
+      message.GetSenderId() == CONTROL_BTN_PLAY_RECORDING ||
+      message.GetSenderId() == CONTROL_BTN_PLAY_EPGTAG)
   {
     Close();
 
     const CFileItemPtr item(new CFileItem(m_progItem));
     if (message.GetSenderId() == CONTROL_BTN_PLAY_RECORDING)
       CServiceBroker::GetPVRManager().GUIActions()->PlayRecording(item, true /* bCheckResume */);
+    else if (message.GetSenderId() == CONTROL_BTN_PLAY_EPGTAG && m_progItem->IsPlayable())
+      CServiceBroker::GetPVRManager().GUIActions()->PlayEpgTag(item);
     else
       CServiceBroker::GetPVRManager().GUIActions()->SwitchToChannel(item, true /* bCheckResume */);
 
@@ -190,8 +171,7 @@ bool CGUIDialogPVRGuideInfo::OnMessage(CGUIMessage& message)
            OnClickButtonRecord(message) ||
            OnClickButtonPlay(message) ||
            OnClickButtonFind(message) ||
-           OnClickButtonAddTimer(message) ||
-           OnClickButtonChannelGuide(message);
+           OnClickButtonAddTimer(message);
   }
 
   return CGUIDialog::OnMessage(message);
@@ -203,7 +183,7 @@ bool CGUIDialogPVRGuideInfo::OnInfo(int actionID)
   return true;
 }
 
-void CGUIDialogPVRGuideInfo::SetProgInfo(const EPG::CEpgInfoTagPtr &tag)
+void CGUIDialogPVRGuideInfo::SetProgInfo(const CPVREpgInfoTagPtr &tag)
 {
   m_progItem = tag;
 }
@@ -245,16 +225,24 @@ void CGUIDialogPVRGuideInfo::OnInitWindow()
       bHideRecord = false;
     }
   }
-  else if (CServiceBroker::GetPVRManager().Clients()->SupportsTimers() && m_progItem->EndAsLocalTime() > CDateTime::GetCurrentDateTime())
+  else if (CServiceBroker::GetPVRManager().Clients()->SupportsTimers() && m_progItem->IsRecordable())
   {
     SET_CONTROL_LABEL(CONTROL_BTN_RECORD, 264);     /* Record */
     bHideRecord = false;
     bHideAddTimer = false;
   }
 
+  if (!m_progItem->IsPlayable())
+    SET_CONTROL_HIDDEN(CONTROL_BTN_PLAY_EPGTAG);
+
   if (bHideRecord)
     SET_CONTROL_HIDDEN(CONTROL_BTN_RECORD);
 
   if (bHideAddTimer)
     SET_CONTROL_HIDDEN(CONTROL_BTN_ADD_TIMER);
+}
+
+void CGUIDialogPVRGuideInfo::ShowFor(const CFileItemPtr& item)
+{
+  CServiceBroker::GetPVRManager().GUIActions()->ShowEPGInfo(item);
 }

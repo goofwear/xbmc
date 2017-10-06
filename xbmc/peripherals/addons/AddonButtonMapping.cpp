@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2014-2016 Team Kodi
+ *      Copyright (C) 2014-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -39,10 +39,12 @@ CAddonButtonMapping::CAddonButtonMapping(CPeripherals& manager, CPeripheral* per
   }
   else
   {
-    m_buttonMap.reset(new CAddonButtonMap(peripheral, addon, mapper->ControllerID()));
+    const std::string controllerId = mapper->ControllerID();
+    m_buttonMap.reset(new CAddonButtonMap(peripheral, addon, controllerId));
     if (m_buttonMap->Load())
     {
-      m_buttonMapping.reset(new CButtonMapping(mapper, m_buttonMap.get(), peripheral->GetActionMap()));
+      IKeymap *keymap = peripheral->GetKeymap(controllerId);
+      m_buttonMapping.reset(new CButtonMapping(mapper, m_buttonMap.get(), keymap));
 
       // Allow the mapper to save our button map
       mapper->SetButtonMapCallback(peripheral->DeviceName(), this);

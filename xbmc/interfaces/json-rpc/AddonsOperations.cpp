@@ -20,6 +20,7 @@
 
 #include "AddonsOperations.h"
 #include "JSONUtils.h"
+#include "ServiceBroker.h"
 #include "addons/AddonManager.h"
 #include "addons/AddonDatabase.h"
 #include "addons/PluginSource.h"
@@ -37,7 +38,7 @@ using namespace KODI::MESSAGING;
 JSONRPC_STATUS CAddonsOperations::GetAddons(const std::string &method, ITransportLayer *transport, IClient *client, const CVariant &parameterObject, CVariant &result)
 {
   std::vector<TYPE> addonTypes;
-  TYPE addonType = TranslateType(parameterObject["type"].asString());
+  TYPE addonType = CAddonInfo::TranslateType(parameterObject["type"].asString());
   CPluginSource::Content content = CPluginSource::Translate(parameterObject["content"].asString());
   CVariant enabled = parameterObject["enabled"];
   CVariant installed = parameterObject["installed"];
@@ -85,28 +86,28 @@ JSONRPC_STATUS CAddonsOperations::GetAddons(const std::string &method, ITranspor
       if (!enabled.isBoolean()) //All
       {
         if (!installed.isBoolean() || installed.asBoolean())
-          CAddonMgr::GetInstance().GetInstalledAddons(typeAddons);
+          CServiceBroker::GetAddonMgr().GetInstalledAddons(typeAddons);
         if (!installed.isBoolean() || (installed.isBoolean() && !installed.asBoolean()))
-          CAddonMgr::GetInstance().GetInstallableAddons(typeAddons);
+          CServiceBroker::GetAddonMgr().GetInstallableAddons(typeAddons);
       }
       else if (enabled.asBoolean() && (!installed.isBoolean() || installed.asBoolean())) //Enabled
-        CAddonMgr::GetInstance().GetAddons(typeAddons);
+        CServiceBroker::GetAddonMgr().GetAddons(typeAddons);
       else if (!installed.isBoolean() || installed.asBoolean())
-        CAddonMgr::GetInstance().GetDisabledAddons(typeAddons);
+        CServiceBroker::GetAddonMgr().GetDisabledAddons(typeAddons);
     }
     else
     {
       if (!enabled.isBoolean()) //All
       {
         if (!installed.isBoolean() || installed.asBoolean())
-          CAddonMgr::GetInstance().GetInstalledAddons(typeAddons, *typeIt);
+          CServiceBroker::GetAddonMgr().GetInstalledAddons(typeAddons, *typeIt);
         if (!installed.isBoolean() || (installed.isBoolean() && !installed.asBoolean()))
-          CAddonMgr::GetInstance().GetInstallableAddons(typeAddons, *typeIt);
+          CServiceBroker::GetAddonMgr().GetInstallableAddons(typeAddons, *typeIt);
       }
       else if (enabled.asBoolean() && (!installed.isBoolean() || installed.asBoolean())) //Enabled
-        CAddonMgr::GetInstance().GetAddons(typeAddons, *typeIt);
+        CServiceBroker::GetAddonMgr().GetAddons(typeAddons, *typeIt);
       else if (!installed.isBoolean() || installed.asBoolean())
-        CAddonMgr::GetInstance().GetDisabledAddons(typeAddons, *typeIt);
+        CServiceBroker::GetAddonMgr().GetDisabledAddons(typeAddons, *typeIt);
     }
 
     addons.insert(addons.end(), typeAddons.begin(), typeAddons.end());
@@ -141,7 +142,7 @@ JSONRPC_STATUS CAddonsOperations::GetAddonDetails(const std::string &method, ITr
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CAddonMgr::GetInstance().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon.get() == NULL ||
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon.get() == NULL ||
       addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
     return InvalidParams;
     
@@ -155,7 +156,7 @@ JSONRPC_STATUS CAddonsOperations::SetAddonEnabled(const std::string &method, ITr
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CAddonMgr::GetInstance().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon == nullptr ||
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon, ADDON::ADDON_UNKNOWN, false) || addon == nullptr ||
     addon->Type() <= ADDON_UNKNOWN || addon->Type() >= ADDON_MAX)
     return InvalidParams;
 
@@ -164,11 +165,11 @@ JSONRPC_STATUS CAddonsOperations::SetAddonEnabled(const std::string &method, ITr
     disabled = !parameterObject["enabled"].asBoolean();
   // we need to toggle the current disabled state of the addon
   else if (parameterObject["enabled"].isString())
-    disabled = !CAddonMgr::GetInstance().IsAddonDisabled(id);
+    disabled = !CServiceBroker::GetAddonMgr().IsAddonDisabled(id);
   else
     return InvalidParams;
 
-  bool success = disabled ? CAddonMgr::GetInstance().DisableAddon(id) : CAddonMgr::GetInstance().EnableAddon(id);
+  bool success = disabled ? CServiceBroker::GetAddonMgr().DisableAddon(id) : CServiceBroker::GetAddonMgr().EnableAddon(id);
   return success ? ACK : InvalidParams;
 }
 
@@ -176,7 +177,7 @@ JSONRPC_STATUS CAddonsOperations::ExecuteAddon(const std::string &method, ITrans
 {
   std::string id = parameterObject["addonid"].asString();
   AddonPtr addon;
-  if (!CAddonMgr::GetInstance().GetAddon(id, addon) || addon.get() == NULL ||
+  if (!CServiceBroker::GetAddonMgr().GetAddon(id, addon) || addon.get() == NULL ||
       addon->Type() < ADDON_VIZ || addon->Type() >= ADDON_MAX)
     return InvalidParams;
     
@@ -224,7 +225,7 @@ static CVariant Serialize(const AddonPtr& addon)
 {
   CVariant variant;
   variant["addonid"] = addon->ID();
-  variant["type"] = ADDON::TranslateType(addon->Type(), false);
+  variant["type"] = CAddonInfo::TranslateType(addon->Type(), false);
   variant["name"] = addon->Name();
   variant["version"] = addon->Version().asString();
   variant["summary"] = addon->Summary();
@@ -279,11 +280,11 @@ void CAddonsOperations::FillDetails(AddonPtr addon, const CVariant& fields, CVar
     // from the addon database because it can't be read from addon.xml
     if (field == "enabled")
     {
-      object[field] = !CAddonMgr::GetInstance().IsAddonDisabled(addon->ID());
+      object[field] = !CServiceBroker::GetAddonMgr().IsAddonDisabled(addon->ID());
     }
     else if (field == "installed")
     {
-      object[field] = CAddonMgr::GetInstance().IsAddonInstalled(addon->ID());
+      object[field] = CServiceBroker::GetAddonMgr().IsAddonInstalled(addon->ID());
     }
     else if (field == "fanart" || field == "thumbnail")
     {

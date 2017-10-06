@@ -111,7 +111,7 @@ static bool sysGetVersionExWByRef(OSVERSIONINFOEXW& osVerInfo)
 }
 #endif // TARGET_WINDOWS
 
-#ifdef TARGET_LINUX
+#if defined(TARGET_LINUX) && !defined(TARGET_ANDROID)
 static std::string getValueFromOs_release(std::string key)
 {
   FILE* os_rel = fopen("/etc/os-release", "r");
@@ -245,13 +245,11 @@ static std::string getValueFromLsb_release(enum lsb_rel_info_type infoType)
 
   return response.substr(key.length(), response.find('\n') - key.length());
 }
-#endif // TARGET_LINUX
+#endif // TARGET_LINUX && !TARGET_ANDROID
 
 CSysInfo g_sysinfo;
 
-CSysInfoJob::CSysInfoJob()
-{
-}
+CSysInfoJob::CSysInfoJob() = default;
 
 bool CSysInfoJob::DoWork()
 {
@@ -409,9 +407,7 @@ CSysInfo::CSysInfo(void) : CInfoLoader(15 * 1000)
   m_iSystemTimeTotalUp = 0;
 }
 
-CSysInfo::~CSysInfo()
-{
-}
+CSysInfo::~CSysInfo() = default;
 
 bool CSysInfo::Load(const TiXmlNode *settings)
 {
@@ -668,12 +664,6 @@ std::string CSysInfo::GetOsPrettyNameWithVersion(void)
   {
     switch (GetWindowsVersion())
     {
-    case WindowsVersionVista:
-      if (osvi.wProductType == VER_NT_WORKSTATION)
-        osNameVer.append("Vista");
-      else
-        osNameVer.append("Server 2008");
-      break;
     case WindowsVersionWin7:
       if (osvi.wProductType == VER_NT_WORKSTATION)
         osNameVer.append("7");
@@ -841,9 +831,7 @@ CSysInfo::WindowsVersion CSysInfo::GetWindowsVersion()
     OSVERSIONINFOEXW osvi = {};
     if (sysGetVersionExWByRef(osvi))
     {
-      if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
-        m_WinVer = WindowsVersionVista;
-      else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
+      if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
         m_WinVer = WindowsVersionWin7;
       else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
         m_WinVer = WindowsVersionWin8;
@@ -852,7 +840,7 @@ CSysInfo::WindowsVersion CSysInfo::GetWindowsVersion()
       else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
         m_WinVer = WindowsVersionWin10;
       /* Insert checks for new Windows versions here */
-      else if ( (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion > 3) || osvi.dwMajorVersion > 6)
+      else if ( (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion > 3) || osvi.dwMajorVersion > 10)
         m_WinVer = WindowsVersionFuture;
     }
   }
@@ -1370,6 +1358,6 @@ CJob *CSysInfo::GetJob() const
 
 void CSysInfo::OnJobComplete(unsigned int jobID, bool success, CJob *job)
 {
-  m_info = ((CSysInfoJob *)job)->GetData();
+  m_info = static_cast<CSysInfoJob*>(job)->GetData();
   CInfoLoader::OnJobComplete(jobID, success, job);
 }

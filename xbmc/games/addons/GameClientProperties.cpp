@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2012-2016 Team Kodi
+ *      Copyright (C) 2012-2017 Team Kodi
  *      http://kodi.tv
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 
 #include "GameClientProperties.h"
 #include "GameClient.h"
+#include "ServiceBroker.h"
 #include "addons/IAddon.h"
 #include "addons/AddonManager.h"
 #include "addons/GameResource.h"
@@ -32,18 +33,17 @@
 
 #include <cstring>
 
+using namespace KODI;
 using namespace ADDON;
 using namespace GAME;
 using namespace XFILE;
 
 #define GAME_CLIENT_RESOURCES_DIRECTORY  "resources"
 
-CGameClientProperties::CGameClientProperties(const CGameClient* parent, game_client_properties*& props)
+CGameClientProperties::CGameClientProperties(const CGameClient* parent, AddonProps_Game& props)
   : m_parent(parent),
-    m_properties()
+    m_properties(props)
 {
-  // Allow the caller to access the property structure directly
-  props = &m_properties;
 }
 
 void CGameClientProperties::ReleaseResources(void)
@@ -98,15 +98,15 @@ const char** CGameClientProperties::GetProxyDllPaths(void)
     {
       const std::string& strAddonId = it->first;
       AddonPtr addon;
-      if (CAddonMgr::GetInstance().GetAddon(strAddonId, addon, ADDON_GAMEDLL, false))
+      if (CServiceBroker::GetAddonMgr().GetAddon(strAddonId, addon, ADDON_GAMEDLL, false))
       {
         // If add-on is disabled, ask the user to enable it
-        if (CAddonMgr::GetInstance().IsAddonDisabled(addon->ID()))
+        if (CServiceBroker::GetAddonMgr().IsAddonDisabled(addon->ID()))
         {
           // Failed to play game
           // This game depends on a disabled add-on. Would you like to enable it?
           if (CGUIDialogYesNo::ShowAndGetInput(CVariant{ 35210 }, CVariant{ 35215 }))
-            CAddonMgr::GetInstance().EnableAddon(addon->ID());
+            CServiceBroker::GetAddonMgr().EnableAddon(addon->ID());
           else
             addon.reset();
         }
@@ -133,7 +133,7 @@ const char** CGameClientProperties::GetResourceDirectories(void)
     {
       const std::string& strAddonId = it->first;
       AddonPtr addon;
-      if (CAddonMgr::GetInstance().GetAddon(strAddonId, addon, ADDON_RESOURCE_GAMES))
+      if (CServiceBroker::GetAddonMgr().GetAddon(strAddonId, addon, ADDON_RESOURCE_GAMES))
       {
         std::shared_ptr<CGameResource> resource = std::static_pointer_cast<CGameResource>(addon);
 

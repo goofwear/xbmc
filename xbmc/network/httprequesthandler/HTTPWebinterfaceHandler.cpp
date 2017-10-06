@@ -19,6 +19,7 @@
  */
 
 #include "HTTPWebinterfaceHandler.h"
+#include "ServiceBroker.h"
 #include "addons/AddonManager.h"
 #include "addons/AddonSystemSettings.h"
 #include "addons/Webinterface.h"
@@ -40,7 +41,7 @@ CHTTPWebinterfaceHandler::CHTTPWebinterfaceHandler(const HTTPRequest &request)
   SetFile(file, responseStatus);
 }
 
-bool CHTTPWebinterfaceHandler::CanHandleRequest(const HTTPRequest &request)
+bool CHTTPWebinterfaceHandler::CanHandleRequest(const HTTPRequest &request) const
 {
   return true;
 }
@@ -96,7 +97,7 @@ bool CHTTPWebinterfaceHandler::ResolveAddon(const std::string &url, ADDON::Addon
     if (components.size() <= 1)
       return false;
 
-    if (!ADDON::CAddonMgr::GetInstance().GetAddon(components.at(1), addon) || addon == NULL)
+    if (!CServiceBroker::GetAddonMgr().GetAddon(components.at(1), addon) || addon == NULL)
       return false;
 
     addonPath = addon->Path();
